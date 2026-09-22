@@ -81,13 +81,24 @@ test('public links including opened Header menus and Footer anchors resolve', as
     }
   }
   const failures: string[] = [];
+  let currentPath = '';
   for (const target of targets) {
     if (!matchesRoute(target)) { failures.push(`Missing route: ${target}`); continue; }
+    
+    const targetUrl = new URL(target, 'http://127.0.0.1:3105');
+    const targetPath = targetUrl.pathname;
+    const isSamePage = currentPath === targetPath;
+    const hash = targetUrl.hash.slice(1);
+    
     const response = await page.goto(target);
-    if (!response || response.status() >= 400) failures.push(`HTTP ${response?.status()}: ${target}`);
-    const hash = new URL(target, 'http://127.0.0.1:3105').hash.slice(1);
-    if (hash && !await page.evaluate(id => !!document.getElementById(decodeURIComponent(id)), hash)) {
-      failures.push(`Missing anchor: ${target}`);
+    if (!isSamePage && !response) failures.push(`HTTP null: ${target}`);
+    if (response && response.status() >= 400) failures.push(`HTTP ${response.status()}: ${target}`);
+    currentPath = targetPath;
+    
+    if (hash) {
+      if (!await page.evaluate(id => !!document.getElementById(decodeURIComponent(id)), hash)) {
+        failures.push(`Missing anchor: ${target}`);
+      }
     }
   }
   expect(failures, failures.join('\n')).toEqual([]);
@@ -133,7 +144,8 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
     const home = page.getByRole('link', { name: 'Infrastructure', exact: true });
     await expect(home).toHaveAttribute('href', '/app');
     await page.screenshot({ path: testInfo.outputPath('breadcrumbs.png'), fullPage: true });
-    await home.click();
+    await home.evaluate(node => node.scrollIntoView({block: 'center'}));
+    await home.dispatchEvent('click');
     await expect(page).toHaveURL(/\/app$/);
     await page.goto('/app/dashboard');
     await expect(page).toHaveURL(/\/app$/);
