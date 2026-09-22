@@ -35,12 +35,6 @@ def start_scheduler():
         replace_existing=True,
         max_instances=1,
     )
-    scheduler.add_job(
-        _cleanup_old_metrics,
-        trigger=IntervalTrigger(hours=6),
-        id="cleanup",
-        replace_existing=True,
-    )
     scheduler.start()
     log.info("scheduler_started")
 
@@ -118,19 +112,3 @@ async def _evaluate_alerts():
         await evaluate_all_rules()
     except Exception as e:
         log.error("alert_eval_error", error=str(e))
-
-
-async def _cleanup_old_metrics():
-    """Delete metrics older than 30 days."""
-    from app.database import AsyncSessionLocal
-    from app.models.metric import ServerMetric, ContainerMetric, DiskMetric
-    from sqlalchemy import delete
-    from datetime import datetime, timezone, timedelta
-
-    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
-    async with AsyncSessionLocal() as db:
-        await db.execute(delete(ServerMetric).where(ServerMetric.time < cutoff))
-        await db.execute(delete(ContainerMetric).where(ContainerMetric.time < cutoff))
-        await db.execute(delete(DiskMetric).where(DiskMetric.time < cutoff))
-        await db.commit()
-    log.info("metrics_cleanup_done", cutoff=str(cutoff))
