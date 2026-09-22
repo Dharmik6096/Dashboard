@@ -13,6 +13,6 @@ export default defineConfig({
     command: 'npm run dev -- --webpack --hostname 127.0.0.1 --port 3105',
     url: 'http://127.0.0.1:3105/servers',
     timeout: 120_000,
-    reuseExistingServer: false,
+    reuseExistingServer: true,
   },
 });

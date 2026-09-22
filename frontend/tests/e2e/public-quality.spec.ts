@@ -1,4 +1,5 @@
-import { test, expect, type Locator, type Page } from './fixture';
+import { test, expect } from './fixture';
+import { type Locator, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { publicPages } from '../../lib/public-pages';
 
@@ -17,7 +18,7 @@ async function clickAndExpectSameTab(page: Page, link: Locator, expectedHref: st
   await link.click();
   await expect.poll(() => page.context().pages().length).toBe(count);
   const expected = new URL(expectedHref, 'http://127.0.0.1:3105');
-  await expect(page).toHaveURL(url => url.pathname === expected.pathname && url.hash === expected.hash);
+  await expect(page).toHaveURL((url: URL) => url.pathname === expected.pathname && url.hash === expected.hash);
 }
 
 test('every desktop Header menu link navigates in the same tab', async ({ page }) => {
@@ -26,7 +27,7 @@ test('every desktop Header menu link navigates in the same tab', async ({ page }
     await page.goto('/');
     const menu = page.locator('header').getByRole('button', { name: new RegExp(`^${menuName}`) });
     await menu.hover(); await expect(menu).toHaveAttribute('aria-expanded', 'true');
-    const link = page.locator('header').getByText(label, { exact: true }).last().locator('xpath=ancestor::a[1]');
+    const link = page.locator('header').getByText(new RegExp(`^${label}`)).first().locator('xpath=ancestor::a[1]');
     await clickAndExpectSameTab(page, link, href);
   }
   await page.goto('/'); await clickAndExpectSameTab(page, page.locator('header').getByRole('link', { name: 'Pricing', exact: true }), '/pricing');
