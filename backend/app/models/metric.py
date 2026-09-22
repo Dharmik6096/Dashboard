@@ -10,8 +10,11 @@ class ServerMetric(Base):
     """Time-series server metrics — one row per sample."""
     __tablename__ = "server_metrics"
 
+    # TimescaleDB requires every unique constraint to include the time
+    # partitioning column. The composite key keeps UUID identifiers while
+    # making this table valid as a hypertable.
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True, server_default=func.now())
+    time: Mapped[datetime] = mapped_column(DateTime(timezone=True), primary_key=True, nullable=False, index=True, server_default=func.now())
     server_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("servers.id", ondelete="CASCADE"), nullable=False, index=True)
     cpu_percent: Mapped[float | None] = mapped_column(Float, nullable=True)
     load_1: Mapped[float | None] = mapped_column(Float, nullable=True)
