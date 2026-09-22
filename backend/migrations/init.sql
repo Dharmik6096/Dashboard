@@ -3,6 +3,7 @@
 
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS timescaledb;
 
 -- Users
 CREATE TABLE IF NOT EXISTS users (
@@ -149,7 +150,7 @@ CREATE INDEX IF NOT EXISTS idx_container_events_container ON container_events(co
 
 -- Server metrics (time-series)
 CREATE TABLE IF NOT EXISTS server_metrics (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID NOT NULL DEFAULT uuid_generate_v4(),
     time TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     server_id UUID REFERENCES servers(id) ON DELETE CASCADE,
     cpu_percent NUMERIC,
@@ -164,9 +165,21 @@ CREATE TABLE IF NOT EXISTS server_metrics (
     swap_total BIGINT,
     swap_used BIGINT,
     net_rx_rate NUMERIC,
-    net_tx_rate NUMERIC
+    net_tx_rate NUMERIC,
+    PRIMARY KEY (id, time)
 );
 CREATE INDEX IF NOT EXISTS idx_server_metrics_time ON server_metrics(server_id, time DESC);
+SELECT create_hypertable(
+    'server_metrics',
+    'time',
+    migrate_data => TRUE,
+    if_not_exists => TRUE
+);
+SELECT add_retention_policy(
+    'server_metrics',
+    INTERVAL '30 days',
+    if_not_exists => TRUE
+);
 
 -- Container metrics (time-series)
 CREATE TABLE IF NOT EXISTS container_metrics (
