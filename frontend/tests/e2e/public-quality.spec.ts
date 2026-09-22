@@ -26,7 +26,7 @@ test('every desktop Header menu link navigates in the same tab', async ({ page }
     await page.goto('/');
     const menu = page.locator('header').getByRole('button', { name: new RegExp(`^${menuName}`) });
     await menu.hover(); await expect(menu).toHaveAttribute('aria-expanded', 'true');
-    const link = page.locator('header').getByText(label, { exact: true }).last().locator('xpath=ancestor::a[1]');
+    const link = page.locator('header').locator(`xpath=.//strong/text()[1][normalize-space(.)="${label}"]/ancestor::a[1]`).last();
     await clickAndExpectSameTab(page, link, href);
   }
   await page.goto('/'); await clickAndExpectSameTab(page, page.locator('header').getByRole('link', { name: 'Pricing', exact: true }), '/pricing');
