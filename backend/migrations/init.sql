@@ -214,7 +214,7 @@ SELECT add_retention_policy(
 
 -- Disk metrics
 CREATE TABLE IF NOT EXISTS disk_metrics (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID NOT NULL DEFAULT uuid_generate_v4(),
     time TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     server_id UUID REFERENCES servers(id) ON DELETE CASCADE,
     mount_point VARCHAR(255),
@@ -225,9 +225,21 @@ CREATE TABLE IF NOT EXISTS disk_metrics (
     use_percent NUMERIC,
     inode_total BIGINT,
     inode_used BIGINT,
-    inode_percent NUMERIC
+    inode_percent NUMERIC,
+    PRIMARY KEY (id, time)
 );
 CREATE INDEX IF NOT EXISTS idx_disk_metrics_time ON disk_metrics(server_id, time DESC);
+SELECT create_hypertable(
+    'disk_metrics',
+    'time',
+    migrate_data => TRUE,
+    if_not_exists => TRUE
+);
+SELECT add_retention_policy(
+    'disk_metrics',
+    INTERVAL '30 days',
+    if_not_exists => TRUE
+);
 
 -- Alert rules
 CREATE TABLE IF NOT EXISTS alert_rules (
