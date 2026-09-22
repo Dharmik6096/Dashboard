@@ -44,7 +44,9 @@ api.interceptors.response.use(
           localStorage.removeItem("access_token");
           localStorage.removeItem("refresh_token");
           sessionStorage.removeItem("access_token");
-          if (!window.location.pathname.includes("/login")) {
+          // Only force-redirect to /login from protected dashboard routes.
+          // Public/marketing pages must not redirect on API failures.
+          if (window.location.pathname.startsWith("/app")) {
             window.location.replace("/login");
           }
         }
@@ -52,7 +54,11 @@ api.interceptors.response.use(
         localStorage.removeItem("access_token");
         localStorage.removeItem("refresh_token");
         sessionStorage.removeItem("access_token");
-        window.location.replace("/login");
+        // Only force-redirect to /login from protected dashboard routes.
+        // Public/marketing pages must not redirect on API failures.
+        if (window.location.pathname.startsWith("/app")) {
+          window.location.replace("/login");
+        }
       }
     }
 
