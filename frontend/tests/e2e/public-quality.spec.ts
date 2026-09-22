@@ -67,3 +67,5 @@ test('Header menu has a visible keyboard focus indicator and opens from the keyb
 test('sitemap and robots expose public routes and protect dashboard crawling', async ({ request }) => {
   const sitemap=await request.get('/sitemap.xml');expect(sitemap.ok()).toBeTruthy();const xml=await sitemap.text();for(const page of Object.values(publicPages).filter(item=>!("index" in item)||item.index!==false))expect(xml).toContain(page.path==='/'?'http://localhost:3000/':`http://localhost:3000${page.path}`);const robots=await request.get('/robots.txt');expect(robots.ok()).toBeTruthy();expect(await robots.text()).toContain('Disallow: /app/');
 });
+
+// force cache invalidation
