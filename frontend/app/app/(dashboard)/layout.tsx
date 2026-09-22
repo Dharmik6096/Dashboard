@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import { FilterProvider } from "@/lib/FilterContext";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
 import { Footer } from "@/components/layout/Footer";
@@ -17,6 +18,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         setSidebarCollapsed(true);
       }
       setMounted(true);
+      
+      // Client-side guard: if no token exists, redirect to login
+      if (!localStorage.getItem("access_token") && !sessionStorage.getItem("access_token") && !localStorage.getItem("refresh_token")) {
+        window.location.replace("/login");
+      }
     }, 0);
   }, []);
 
@@ -29,24 +35,28 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   // Prevent layout jump on hydration
   if (!mounted) {
     return (
-      <div className="layout" style={{ visibility: "hidden" }}>
-        <Topbar collapsed={false} />
-        <Sidebar collapsed={false} onToggle={() => { }} />
-      </div>
+      <FilterProvider>
+        <div className="layout" style={{ visibility: "hidden" }}>
+          <Topbar collapsed={false} />
+          <Sidebar collapsed={false} onToggle={() => { }} />
+        </div>
+      </FilterProvider>
     );
   }
 
   return (
-    <div className="layout">
-      <Topbar collapsed={sidebarCollapsed} />
-      <Sidebar collapsed={sidebarCollapsed} onToggle={handleToggle} />
-      <div className={`main-area ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
-        <main className="page-content fade-in">
-          {children}
-        </main>
-        <Footer />
+    <FilterProvider>
+      <div className="layout">
+        <Topbar collapsed={sidebarCollapsed} />
+        <Sidebar collapsed={sidebarCollapsed} onToggle={handleToggle} />
+        <div className={`main-area ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
+          <main className="page-content fade-in">
+            {children}
+          </main>
+          <Footer />
+        </div>
+        <AIChatDrawer />
       </div>
-      <AIChatDrawer />
-    </div>
+    </FilterProvider>
   );
 }
