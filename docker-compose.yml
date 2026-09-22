@@ -5,9 +5,10 @@ services:
   # PostgreSQL 16
   # ─────────────────────────────────────────
   postgres:
-    image: postgres:16-alpine
+    image: timescale/timescaledb:2.30.1-pg16
     container_name: dashboard_postgres
     restart: unless-stopped
+    command: ["postgres", "-c", "shared_preload_libraries=timescaledb"]
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-devops_dashboard}
       POSTGRES_USER: ${POSTGRES_USER:-dashboard_user}
