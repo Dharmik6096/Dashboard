@@ -38,3 +38,8 @@ pnpm-debug.log*
 
 # typescript
 *.tsbuildinfo
+
+# playwright auth
+auth.json
+*.storage-state.json
+playwright/.auth/
