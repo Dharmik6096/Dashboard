@@ -1,0 +1,10 @@
+import type { Metadata } from "next";
+import { Boxes, Cloud, Database, Network, Server, ShipWheel, Waypoints, Workflow } from "lucide-react";
+import { PublicLayout } from "@/components/marketing/PublicLayout";
+import { PageHero } from "@/components/marketing/PagePrimitives";
+import { publicPageMetadata } from "@/lib/public-pages";
+export const metadata: Metadata = publicPageMetadata("integrations");
+const integrations=[
+ ["Linux",Server,"Host, process, disk and network telemetry","Available"], ["Docker",Boxes,"Container state, events and resource usage","Available"], ["Nginx",Waypoints,"Workers, configuration health and request signals","Available"], ["PostgreSQL",Database,"Connections, activity and slow queries","Available"], ["Redis",Database,"Memory, hit rate, clients and evictions","Available"], ["RabbitMQ",Workflow,"Queues, consumers and message rates","Available"], ["Webhooks",Network,"Send structured alert events to your workflow","Available"], ["Cloud providers",Cloud,"Cloud account and managed service discovery","Roadmap"], ["Kubernetes",ShipWheel,"Workload, node and cluster visibility","Roadmap"],
+ ] as const;
+export default function IntegrationsPage(){return <PublicLayout><main><PageHero kicker="Integrations" title="Meet your infrastructure where it already runs." description="Start with proven Linux and Docker coverage, then connect the data services and alert channels your team operates every day." primary="Connect your first host" secondary="Read the docs" secondaryHref="/docs"/><section className="page-section alt"><div className="public-shell"><div className="content-heading"><h2>Native operational context</h2><p>Integrations are modeled as connected parts of one system, not isolated dashboards.</p></div><div className="integration-grid">{integrations.map(([name,Icon,text,status])=><article id={name.toLowerCase().replaceAll(" ","-")} className="integration-card" key={name}><span className="integration-logo"><Icon size={19}/></span><h3>{name}</h3><p>{text}</p><span>{status}</span></article>)}</div></div></section></main></PublicLayout>}

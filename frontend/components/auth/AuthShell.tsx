@@ -1,0 +1,9 @@
+import Link from "next/link";
+import { Activity, Boxes, Database, ShieldCheck } from "lucide-react";
+import { BrandMark } from "@/components/marketing/BrandMark";
+import { brand } from "@/lib/brand";
+
+export function AuthShell({ eyebrow, title, description, children }: { eyebrow: string; title: string; description: string; children: React.ReactNode }) {
+  return <main className="auth-page"><section className="auth-story"><Link href="/" className="auth-brand"><BrandMark/><span>{brand.name}</span><small>{brand.version}</small></Link><div className="auth-story-copy"><span className="auth-eyebrow">Read-only observability</span><h1>See the whole system.<br/><em>Keep control separate.</em></h1><p>One secure operating view across infrastructure, containers, data services and every signal between them.</p><div className="auth-mini-stage"><div className="auth-mini-top"><span><i/> Production</span><small>Live · 15s</small></div><div className="auth-mini-metrics">{[[Activity,"99.98%","Availability"],[Boxes,"246","Containers"],[Database,"24","Data services"]].map(([Icon,value,label])=><div key={label as string}><Icon size={15}/><strong>{value as string}</strong><span>{label as string}</span></div>)}</div><svg viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden="true"><polyline points="0,24 8,20 16,22 24,14 32,17 40,9 48,13 56,7 64,12 72,8 80,16 88,11 100,5" fill="none" stroke="#8177ff" strokeWidth="1.3" vectorEffect="non-scaling-stroke"/></svg></div></div><div className="auth-trust"><ShieldCheck size={15}/><span>No remote mutation controls. Your production boundary stays intact.</span></div></section><section className="auth-panel"><div className="auth-card"><div className="auth-form-head"><span>{eyebrow}</span><h2>{title}</h2><p>{description}</p></div>{children}</div><p className="auth-legal">By continuing, you agree to our <Link href="/legal/terms">Terms</Link> and <Link href="/legal/privacy">Privacy Policy</Link>.</p></section></main>
+}
+

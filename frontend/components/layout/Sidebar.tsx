@@ -1,0 +1,17 @@
+"use client";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { Activity, BellRing, Boxes, BrainCircuit, ChevronLeft, CircleGauge, Clock3, CreditCard, Database, DatabaseZap, FileClock, HardDrive, LogOut, MessageSquareMore, Network, PanelLeft, PlugZap, Server, Settings, ShipWheel, Sparkles, Users, Waypoints } from "lucide-react";
+import api from "@/lib/api";
+import { BrandMark } from "@/components/marketing/BrandMark";
+
+type Item={href:string;label:string;icon:React.ElementType;badge?:"alerts"|"new"};
+const groups:{label:string;items:Item[]}[]=[
+ {label:"Observe",items:[{href:"/app",label:"Overview",icon:CircleGauge},{href:"/app/servers",label:"Servers",icon:Server},{href:"/app/containers",label:"Containers",icon:Boxes},{href:"/app/processes",label:"Processes",icon:Activity},{href:"/app/network",label:"Network",icon:Network},{href:"/app/storage",label:"Storage",icon:HardDrive},{href:"/app/ports",label:"Ports",icon:PlugZap}]},
+ {label:"Data services",items:[{href:"/app/nginx",label:"Nginx",icon:Waypoints},{href:"/app/docker",label:"Docker",icon:ShipWheel},{href:"/app/databases",label:"Databases",icon:Database},{href:"/app/redis",label:"Redis",icon:DatabaseZap},{href:"/app/rabbitmq",label:"RabbitMQ",icon:MessageSquareMore}]},
+ {label:"Investigate",items:[{href:"/app/alerts",label:"Alerts",icon:BellRing,badge:"alerts"},{href:"/app/events",label:"Events",icon:FileClock},{href:"/app/cpu-spikes",label:"CPU spikes",icon:Sparkles},{href:"/app/cron",label:"Cron jobs",icon:Clock3},{href:"/app/ai",label:"AI assistant",icon:BrainCircuit,badge:"new"}]},
+ {label:"Workspace",items:[{href:"/app/team",label:"Team & access",icon:Users},{href:"/app/billing",label:"Plans & billing",icon:CreditCard},{href:"/app/audit",label:"Audit log",icon:FileClock},{href:"/app/settings",label:"Settings",icon:Settings}]},
+];
+export function Sidebar({collapsed,onToggle}:{collapsed:boolean;onToggle:()=>void}){const path=usePathname();const router=useRouter();const[alerts,setAlerts]=useState(0);useEffect(()=>{const run=()=>api.get("/alerts/summary").then(r=>setAlerts(r.data.active||0)).catch(()=>{});run();const timer=setInterval(run,30000);return()=>clearInterval(timer)},[]);function logout(){localStorage.clear();sessionStorage.clear();router.push("/login")}return <aside className={`v2-sidebar ${collapsed?"is-collapsed":""}`}><div className="v2-side-brand"><Link href="/app"><BrandMark compact/><span>DevOps Monitor<small>V2 · READ ONLY</small></span></Link><button onClick={onToggle} aria-label={collapsed?"Expand navigation":"Collapse navigation"}>{collapsed?<PanelLeft size={16}/>:<ChevronLeft size={16}/>}</button></div><nav className="v2-side-nav" aria-label="Dashboard navigation">{groups.map((group,index)=><div className="v2-nav-group" key={group.label}><p>{group.label}</p>{group.items.map(item=>{const active=item.href==="/app"?path===item.href:path.startsWith(item.href);return <Link href={item.href} className={active?"active":""} title={collapsed?item.label:undefined} key={item.href}><item.icon size={16}/><span>{item.label}</span>{item.badge==="alerts"&&alerts>0&&<b>{alerts>99?"99+":alerts}</b>}{item.badge==="new"&&<em>AI</em>}</Link>})}{index<groups.length-1&&<i/>}</div>)}</nav><div className="v2-side-foot"><div className="v2-safety"><span><i/><span>Collection healthy</span></span><small>No server actions enabled</small></div><button onClick={logout}><LogOut size={15}/><span>Sign out</span></button></div></aside>}
+
