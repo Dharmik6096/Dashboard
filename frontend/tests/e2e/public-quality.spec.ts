@@ -1,4 +1,5 @@
-import { test, expect, type Locator, type Page } from './fixture';
+import { test, expect } from './fixture';
+import { type Locator, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { publicPages } from '../../lib/public-pages';
 
@@ -17,7 +18,7 @@ async function clickAndExpectSameTab(page: Page, link: Locator, expectedHref: st
   await link.click();
   await expect.poll(() => page.context().pages().length).toBe(count);
   const expected = new URL(expectedHref, 'http://127.0.0.1:3105');
-  await expect(page).toHaveURL(url => url.pathname === expected.pathname && url.hash === expected.hash);
+  await expect(page).toHaveURL((url: URL) => url.pathname === expected.pathname && url.hash === expected.hash);
 }
 
 test('every desktop Header menu link navigates in the same tab', async ({ page }) => {
@@ -42,7 +43,7 @@ test('every Footer link has a same-tab destination and internal links navigate c
   await page.route('https://github.com/**', route => route.fulfill({ status: 200, contentType: 'text/html', body: '<h1>GitHub</h1>' }));
   await page.route('https://linkedin.com/**', route => route.fulfill({ status: 200, contentType: 'text/html', body: '<h1>LinkedIn</h1>' }));
   await page.goto('/'); const count = await page.locator('footer a').count();
-  for (let index=0; index<count; index+=1) { await page.goto('/'); const link=page.locator('footer a').nth(index); const href=await link.getAttribute('href'); expect(href).toBeTruthy(); await expect(link).not.toHaveAttribute('target','_blank'); const expected=new URL(href!,'http://127.0.0.1:3105'); const pageCount=page.context().pages().length; await link.click(); await expect.poll(()=>page.context().pages().length).toBe(pageCount); await expect(page).toHaveURL(url=>url.origin===expected.origin&&url.pathname===expected.pathname&&url.hash===expected.hash); }
+  for (let index=0; index<count; index+=1) { await page.goto('/'); const link=page.locator('footer a').nth(index); const href=await link.getAttribute('href'); expect(href).toBeTruthy(); await expect(link).not.toHaveAttribute('target','_blank'); const expected=new URL(href!,'http://127.0.0.1:3105'); const pageCount=page.context().pages().length; await link.click(); await expect.poll(()=>page.context().pages().length).toBe(pageCount); await expect(page).toHaveURL((url: URL)=>url.origin===expected.origin&&url.pathname===expected.pathname&&url.hash===expected.hash); }
 });
 
 test('every primary CTA on every marketing page navigates in the same tab', async ({ page }) => {
