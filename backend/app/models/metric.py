@@ -36,7 +36,7 @@ class ContainerMetric(Base):
     __tablename__ = "container_metrics"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True, server_default=func.now())
+    time: Mapped[datetime] = mapped_column(DateTime(timezone=True), primary_key=True, nullable=False, index=True, server_default=func.now())
     server_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("servers.id", ondelete="CASCADE"), nullable=False)
     container_db_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("containers.id", ondelete="CASCADE"), nullable=False, index=True)
     cpu_percent: Mapped[float | None] = mapped_column(Float, nullable=True)

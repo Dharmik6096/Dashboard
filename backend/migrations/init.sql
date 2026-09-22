@@ -183,7 +183,7 @@ SELECT add_retention_policy(
 
 -- Container metrics (time-series)
 CREATE TABLE IF NOT EXISTS container_metrics (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID NOT NULL DEFAULT uuid_generate_v4(),
     time TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     server_id UUID REFERENCES servers(id) ON DELETE CASCADE,
     container_db_id UUID REFERENCES containers(id) ON DELETE CASCADE,
@@ -196,9 +196,21 @@ CREATE TABLE IF NOT EXISTS container_metrics (
     net_tx_rate NUMERIC,
     block_read_rate NUMERIC,
     block_write_rate NUMERIC,
-    pids INTEGER
+    pids INTEGER,
+    PRIMARY KEY (id, time)
 );
 CREATE INDEX IF NOT EXISTS idx_container_metrics_time ON container_metrics(container_db_id, time DESC);
+SELECT create_hypertable(
+    'container_metrics',
+    'time',
+    migrate_data => TRUE,
+    if_not_exists => TRUE
+);
+SELECT add_retention_policy(
+    'container_metrics',
+    INTERVAL '30 days',
+    if_not_exists => TRUE
+);
 
 -- Disk metrics
 CREATE TABLE IF NOT EXISTS disk_metrics (
