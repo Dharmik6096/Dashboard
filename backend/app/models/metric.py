@@ -55,7 +55,7 @@ class DiskMetric(Base):
     __tablename__ = "disk_metrics"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True, server_default=func.now())
+    time: Mapped[datetime] = mapped_column(DateTime(timezone=True), primary_key=True, nullable=False, index=True, server_default=func.now())
     server_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("servers.id", ondelete="CASCADE"), nullable=False, index=True)
     mount_point: Mapped[str] = mapped_column(String(255))
     filesystem: Mapped[str | None] = mapped_column(String(100), nullable=True)
