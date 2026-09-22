@@ -22,7 +22,7 @@ export function SiteFooter() {
         </div>
         {groups.map((group) => (
           <div className="footer-group" key={group.title}>
-            <h3>{group.title}</h3>
+            <h2>{group.title}</h2>
             {group.links.map(([label, href]) => <Link href={href} key={href}>{label}</Link>)}
           </div>
         ))}
