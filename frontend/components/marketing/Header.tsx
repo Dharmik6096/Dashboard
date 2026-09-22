@@ -116,7 +116,7 @@ export function Header() {
             const active = pathname === href || (name === "Resources" && ["/docs", "/company", "/status"].includes(pathname));
             return menu ? (
               <div className="nav-mega-wrap" key={name} onMouseEnter={() => showMenu(name)} onMouseLeave={scheduleClose}>
-                <button className={`site-nav-link ${active || openMenu === name ? "active" : ""}`} onClick={() => setOpenMenu(openMenu === name ? null : name)} onFocus={() => showMenu(name)} aria-expanded={openMenu === name} aria-haspopup="true">
+                <button className={`site-nav-link ${active || openMenu === name ? "active" : ""}`} onClick={() => setOpenMenu(openMenu === name ? null : name)} aria-expanded={openMenu === name} aria-haspopup="true">
                   {name} <ChevronDown size={14} className={openMenu === name ? "rotate" : ""} />
                 </button>
                 {openMenu === name && <MegaPanel menu={menu} />}
