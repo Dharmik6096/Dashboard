@@ -70,23 +70,18 @@ async function mockWorkspaceApi(page: Page) {
       dashboards = [created, ...dashboards];
       return route.fulfill({ status: 201, json: created });
     }
-<<<<<<< Updated upstream
-    if (path === "/dashboards/dashboard-1" && method === "GET") {
-      return route.fulfill({ json: { ...dashboard, panel_count: panels.length, panels, variables } });
-=======
     if (path === "/servers" && method === "GET") {
       return route.fulfill({ json: [] });
     }
     if (path.startsWith("/dashboards/") && path.split("/").length === 3 && method === "GET") {
       const id = path.split("/")[2];
       if (id === "dashboard-1") {
-        return route.fulfill({ json: { ...dashboard, panel_count: panels.length, panels } });
+        return route.fulfill({ json: { ...dashboard, panel_count: panels.length, panels, variables } });
       }
       const found = dashboards.find(d => d.id === id);
       if (found) {
         return route.fulfill({ json: { ...found, panel_count: 0, panels: [] } });
       }
->>>>>>> Stashed changes
     }
     if (path === "/dashboards/dashboard-1" && method === "PATCH") {
       Object.assign(dashboard, request.postDataJSON());
