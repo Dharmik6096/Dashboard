@@ -52,6 +52,46 @@ CREATE TABLE IF NOT EXISTS contact_requests (
     metadata_json JSONB, created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- V2.3 persisted dashboard builder
+CREATE TABLE IF NOT EXISTS dashboards (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    title VARCHAR(160) NOT NULL,
+    slug VARCHAR(180) NOT NULL,
+    description TEXT,
+    default_time_range VARCHAR(30) NOT NULL DEFAULT '1h',
+    refresh_interval_seconds INTEGER NOT NULL DEFAULT 30,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_dashboard_org_slug UNIQUE (organization_id, slug),
+    CONSTRAINT ck_dashboard_time_range CHECK (default_time_range IN ('15m','1h','6h','24h','7d','30d')),
+    CONSTRAINT ck_dashboard_refresh_interval CHECK (refresh_interval_seconds IN (0,5,10,30,60,300))
+);
+CREATE INDEX IF NOT EXISTS ix_dashboards_organization_id ON dashboards(organization_id);
+
+CREATE TABLE IF NOT EXISTS dashboard_panels (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    dashboard_id UUID NOT NULL REFERENCES dashboards(id) ON DELETE CASCADE,
+    title VARCHAR(160) NOT NULL,
+    description TEXT,
+    visualization VARCHAR(30) NOT NULL,
+    metric_source VARCHAR(40) NOT NULL,
+    metric_name VARCHAR(60) NOT NULL,
+    aggregation VARCHAR(20) NOT NULL DEFAULT 'avg',
+    unit VARCHAR(30),
+    query_config JSONB NOT NULL DEFAULT '{}'::jsonb,
+    grid_position JSONB NOT NULL,
+    display_options JSONB NOT NULL DEFAULT '{}'::jsonb,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT ck_panel_visualization CHECK (visualization IN ('time_series','stat','gauge','bar','table')),
+    CONSTRAINT ck_panel_metric_source CHECK (metric_source IN ('server_metrics','container_metrics','disk_metrics')),
+    CONSTRAINT ck_panel_aggregation CHECK (aggregation IN ('avg','min','max','sum','count','p95'))
+);
+CREATE INDEX IF NOT EXISTS ix_dashboard_panels_dashboard_id ON dashboard_panels(dashboard_id);
+
 -- Servers
 CREATE TABLE IF NOT EXISTS servers (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

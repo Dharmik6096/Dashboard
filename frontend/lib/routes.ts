@@ -6,6 +6,8 @@ export const routes = {
   platformDashboardBuilder: '/platform/dashboard-builder',
   platformReadOnlySecurity: '/platform/read-only-security',
   home: '/app',
+  dashboards: '/app/dashboards',
+  dashboard: (id: string | number) => `/app/dashboards/${segment(id)}`,
   servers: '/app/servers',
   addServer: '/app/servers/add',
   server: (id: string | number) => `/app/servers/${segment(id)}`,

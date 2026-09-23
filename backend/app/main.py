@@ -144,8 +144,9 @@ app.include_router(rabbitmq.router, prefix="/api/v1")
 app.include_router(redis.router, prefix="/api/v1")
 app.include_router(cron.router, prefix="/api/v1")
 
-from app.api.v1 import billing, organizations, public
+from app.api.v1 import billing, dashboards, organizations, public
 app.include_router(billing.router, prefix="/api/v1")
+app.include_router(dashboards.router, prefix="/api/v1")
 app.include_router(organizations.router, prefix="/api/v1")
 app.include_router(public.router, prefix="/api/v1")
 
