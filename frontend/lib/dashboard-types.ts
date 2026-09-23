@@ -42,6 +42,19 @@ export type DashboardPanel = {
 
 export type DashboardDetail = DashboardSummary & { panels: DashboardPanel[] };
 
+export type PanelDataPoint = { time: string; value: number | null };
+
+export type PanelMetricData = {
+  panel_id: string;
+  metric_source: DashboardPanel["metric_source"];
+  metric_name: string;
+  aggregation: DashboardPanel["aggregation"];
+  time_range: string;
+  bucket_seconds: number;
+  series: { key: string; label: string; points: PanelDataPoint[] }[];
+  generated_at: string;
+};
+
 export type WorkspaceRole = "owner" | "admin" | "analyst" | "viewer";
 
 export const canEditDashboards = (role?: string): boolean =>

@@ -7,6 +7,7 @@ import { ArrowLeft, BarChart3, Edit3, Gauge, LineChart, Plus, Save, ShieldCheck,
 import api from "@/lib/api";
 import { canEditDashboards, DashboardDetail, DashboardPanel } from "@/lib/dashboard-types";
 import { routes } from "@/lib/routes";
+import { PanelVisualization } from "./PanelVisualization";
 import styles from "./DashboardWorkspace.module.css";
 
 const metricCatalog = {
@@ -226,7 +227,10 @@ export function DashboardEditor({ dashboardId }: { dashboardId: string }) {
                 <div><h2>{panel.title}</h2><p>{panel.visualization.replace("_", " ")} · {panel.aggregation}</p></div>
                 {editable && <div className={styles.panelActions}><button className={styles.iconButton} type="button" onClick={() => openPanel(panel)} aria-label={`Edit ${panel.title}`}><Edit3 size={13} /></button><button className={styles.iconButton} type="button" onClick={() => void removePanel(panel)} aria-label={`Delete ${panel.title}`}><Trash2 size={13} /></button></div>}
               </div>
-              <div className={styles.panelBody}><div><Icon size={24} style={{ margin: "0 auto 10px", color: "#60a5fa" }} /><strong>{panel.aggregation}({panel.metric_name})</strong><span>{panel.metric_source} · stored query configuration</span></div></div>
+              <div className={styles.panelBody}>
+                <span className={styles.metricKind}><Icon size={13} /> {panel.metric_source}</span>
+                <PanelVisualization dashboardId={dashboard.id} panel={panel} timeRange={dashboard.default_time_range} refreshSeconds={dashboard.refresh_interval_seconds} />
+              </div>
             </article>;
           })}
         </div>
