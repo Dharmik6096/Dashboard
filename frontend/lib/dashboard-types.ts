@@ -3,6 +3,7 @@ export type DashboardSummary = {
   title: string;
   slug: string;
   description: string | null;
+  folder_id: string | null;
   default_time_range: string;
   refresh_interval_seconds: number;
   panel_count: number;
@@ -26,6 +27,9 @@ export type DashboardPanel = {
     server_id: string | null;
     container_id: string | null;
     mount_point: string | null;
+    server_variable: string | null;
+    container_variable: string | null;
+    mount_point_variable: string | null;
     group_by: "none" | "server" | "container" | "mount_point";
   };
   grid_position: GridPosition;
@@ -40,7 +44,32 @@ export type DashboardPanel = {
   updated_at: string | null;
 };
 
-export type DashboardDetail = DashboardSummary & { panels: DashboardPanel[] };
+export type DashboardFolder = {
+  id: string;
+  title: string;
+  slug: string;
+  description: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export type DashboardVariable = {
+  id: string;
+  dashboard_id: string;
+  name: string;
+  label: string;
+  variable_type: "custom" | "server" | "container" | "mount_point";
+  options: { label: string; value: string }[];
+  default_value: string | null;
+  sort_order: number;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export type DashboardDetail = DashboardSummary & {
+  panels: DashboardPanel[];
+  variables: DashboardVariable[];
+};
 
 export type PanelDataPoint = { time: string; value: number | null };
 

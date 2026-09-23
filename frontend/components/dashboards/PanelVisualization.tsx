@@ -34,11 +34,13 @@ export function PanelVisualization({
   panel,
   timeRange,
   refreshSeconds,
+  variableValues,
 }: {
   dashboardId: string;
   panel: DashboardPanel;
   timeRange: string;
   refreshSeconds: number;
+  variableValues: Record<string, string>;
 }) {
   const [data, setData] = useState<PanelMetricData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -46,9 +48,13 @@ export function PanelVisualization({
 
   const load = useCallback(async () => {
     try {
+      const params = new URLSearchParams({ time_range: timeRange });
+      Object.entries(variableValues).forEach(([name, value]) => {
+        if (value) params.append("var", `${name}=${value}`);
+      });
       const response = await api.get<PanelMetricData>(
         `/dashboards/${dashboardId}/panels/${panel.id}/data`,
-        { params: { time_range: timeRange } },
+        { params },
       );
       setData(response.data);
       setError(null);
@@ -57,7 +63,7 @@ export function PanelVisualization({
     } finally {
       setLoading(false);
     }
-  }, [dashboardId, panel.id, timeRange]);
+  }, [dashboardId, panel.id, timeRange, variableValues]);
 
   useEffect(() => {
     setLoading(true);
