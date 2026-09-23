@@ -70,6 +70,18 @@ async function mockWorkspaceApi(page: Page) {
       panels = [...panels, created];
       return route.fulfill({ status: 201, json: created });
     }
+    if (path === "/dashboards/dashboard-1/panels/panel-1/data" && method === "GET") {
+      return route.fulfill({ json: {
+        panel_id: "panel-1",
+        metric_source: "server_metrics",
+        metric_name: "cpu_percent",
+        aggregation: "avg",
+        time_range: "1h",
+        bucket_seconds: 15,
+        series: [{ key: "all", label: "All targets", points: [{ time: now, value: 42.5 }] }],
+        generated_at: now,
+      } });
+    }
     if (path === "/dashboards/dashboard-1/panels/panel-1" && method === "PATCH") {
       panels = panels.map((panel) => panel.id === "panel-1"
         ? { ...panel, ...request.postDataJSON(), updated_at: now }
@@ -115,14 +127,14 @@ test("adds, edits and deletes a real panel definition", async ({ page }) => {
   await page.getByLabel("Panel name").fill("CPU utilization");
   await page.getByRole("button", { name: "Save panel" }).click();
   await expect(page.getByRole("heading", { level: 2, name: "CPU utilization" })).toBeVisible();
-  await expect(page.getByText("avg(cpu_percent)")).toBeVisible();
+  await expect(page.getByLabel("CPU utilization metric chart")).toBeVisible();
 
   await page.getByRole("button", { name: "Edit CPU utilization" }).click();
   await page.getByLabel("Panel name").fill("CPU saturation");
   await page.getByLabel("Aggregation").selectOption("max");
   await page.getByRole("button", { name: "Save panel" }).click();
   await expect(page.getByRole("heading", { level: 2, name: "CPU saturation" })).toBeVisible();
-  await expect(page.getByText("max(cpu_percent)")).toBeVisible();
+  await expect(page.getByLabel("CPU saturation metric chart")).toBeVisible();
 
   page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "Delete CPU saturation" }).click();
