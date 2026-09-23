@@ -47,6 +47,7 @@ export function DashboardLibrary() {
   const [folderTitle, setFolderTitle] = useState("");
   const [folderDescription, setFolderDescription] = useState("");
   const [selectedFolder, setSelectedFolder] = useState("all");
+  const [editingFolder, setEditingFolder] = useState<DashboardFolder | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -98,11 +99,16 @@ export function DashboardLibrary() {
     event.preventDefault();
     setSaving(true);
     try {
-      const response = await api.post<DashboardFolder>("/dashboards/folders", { title: folderTitle, description: folderDescription || null });
-      setFolders((current) => [...current, response.data].sort((a, b) => a.title.localeCompare(b.title)));
+      const response = editingFolder
+        ? await api.patch<DashboardFolder>(`/dashboards/folders/${editingFolder.id}`, { title: folderTitle, description: folderDescription || null })
+        : await api.post<DashboardFolder>("/dashboards/folders", { title: folderTitle, description: folderDescription || null });
+      setFolders((current) => (editingFolder
+        ? current.map((item) => item.id === response.data.id ? response.data : item)
+        : [...current, response.data]).sort((a, b) => a.title.localeCompare(b.title)));
       setFolderTitle("");
       setFolderDescription("");
       setFolderDialog(false);
+      setEditingFolder(null);
       setSelectedFolder(response.data.id);
       setError(null);
     } catch (requestError) {
@@ -110,6 +116,22 @@ export function DashboardLibrary() {
     } finally {
       setSaving(false);
     }
+  }
+
+  function openNewFolder() {
+    setEditingFolder(null);
+    setFolderTitle("");
+    setFolderDescription("");
+    setFolderDialog(true);
+  }
+
+  function openFolderSettings() {
+    const folder = folders.find((item) => item.id === selectedFolder);
+    if (!folder) return;
+    setEditingFolder(folder);
+    setFolderTitle(folder.title);
+    setFolderDescription(folder.description || "");
+    setFolderDialog(true);
   }
 
   async function removeSelectedFolder() {
@@ -159,7 +181,8 @@ export function DashboardLibrary() {
         <button className={selectedFolder === "all" ? styles.folderActive : ""} type="button" onClick={() => setSelectedFolder("all")}><LayoutDashboard size={14} /> All</button>
         <button className={selectedFolder === "unfiled" ? styles.folderActive : ""} type="button" onClick={() => setSelectedFolder("unfiled")}><Folder size={14} /> Unfiled</button>
         {folders.map((folder) => <button className={selectedFolder === folder.id ? styles.folderActive : ""} type="button" key={folder.id} onClick={() => setSelectedFolder(folder.id)}><Folder size={14} /> {folder.title}</button>)}
-        {editable && <button type="button" onClick={() => setFolderDialog(true)}><FolderPlus size={14} /> New folder</button>}
+        {editable && <button type="button" onClick={openNewFolder}><FolderPlus size={14} /> New folder</button>}
+        {editable && folders.some((folder) => folder.id === selectedFolder) && <button type="button" onClick={openFolderSettings}>Rename</button>}
         {editable && folders.some((folder) => folder.id === selectedFolder) && <button className={styles.folderDanger} type="button" onClick={() => void removeSelectedFolder()}><Trash2 size={13} /> Delete folder</button>}
       </div>
 
@@ -228,11 +251,11 @@ export function DashboardLibrary() {
       {folderDialog && (
         <div className={styles.dialogBackdrop} role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) setFolderDialog(false); }}>
           <div className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="new-folder-title">
-            <div className={styles.dialogHeader}><div><h2 id="new-folder-title">Create folder</h2><p>Organize dashboards inside this workspace.</p></div><button className={styles.iconButton} type="button" onClick={() => setFolderDialog(false)} aria-label="Close"><X size={16} /></button></div>
+            <div className={styles.dialogHeader}><div><h2 id="new-folder-title">{editingFolder ? "Edit folder" : "Create folder"}</h2><p>Organize dashboards inside this workspace.</p></div><button className={styles.iconButton} type="button" onClick={() => { setFolderDialog(false); setEditingFolder(null); }} aria-label="Close"><X size={16} /></button></div>
             <form className={styles.form} onSubmit={createFolder}>
               <label className={styles.field}>Folder name<input autoFocus required maxLength={120} value={folderTitle} onChange={(event) => setFolderTitle(event.target.value)} /></label>
               <label className={styles.field}>Description<textarea maxLength={1000} value={folderDescription} onChange={(event) => setFolderDescription(event.target.value)} /></label>
-              <div className={styles.dialogActions}><button className={styles.secondary} type="button" onClick={() => setFolderDialog(false)}>Cancel</button><button className={styles.primary} disabled={saving || !folderTitle.trim()}>{saving ? "Creating…" : "Create folder"}</button></div>
+              <div className={styles.dialogActions}><button className={styles.secondary} type="button" onClick={() => { setFolderDialog(false); setEditingFolder(null); }}>Cancel</button><button className={styles.primary} disabled={saving || !folderTitle.trim()}>{saving ? "Saving…" : editingFolder ? "Save folder" : "Create folder"}</button></div>
             </form>
           </div>
         </div>

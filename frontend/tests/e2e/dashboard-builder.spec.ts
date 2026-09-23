@@ -48,6 +48,10 @@ async function mockWorkspaceApi(page: Page) {
       folders = [];
       return route.fulfill({ status: 204, body: "" });
     }
+    if (path === "/dashboards/folders/folder-1" && method === "PATCH") {
+      folders = folders.map((folder) => folder.id === "folder-1" ? { ...folder, ...request.postDataJSON(), updated_at: now } : folder);
+      return route.fulfill({ json: folders[0] });
+    }
 
     if (path === "/dashboards" && method === "GET") {
       return route.fulfill({ json: dashboards.map(({ panels, ...item }) => {
@@ -115,6 +119,10 @@ async function mockWorkspaceApi(page: Page) {
       variables = [];
       return route.fulfill({ status: 204, body: "" });
     }
+    if (path === "/dashboards/dashboard-1/variables/variable-1" && method === "PATCH") {
+      variables = variables.map((variable) => variable.id === "variable-1" ? { ...variable, ...request.postDataJSON(), updated_at: now } : variable);
+      return route.fulfill({ json: variables[0] });
+    }
 
     return route.fulfill({ status: 404, json: { detail: `Unmocked ${method} ${path}` } });
   });
@@ -148,6 +156,10 @@ test("creates a folder and a persisted dashboard variable", async ({ page }) => 
   await page.getByLabel("Folder name").fill("Production");
   await page.getByRole("button", { name: "Create folder" }).click();
   await expect(page.getByRole("button", { name: "Production" })).toBeVisible();
+  await page.getByRole("button", { name: "Rename" }).click();
+  await page.getByLabel("Folder name").fill("Critical services");
+  await page.getByRole("button", { name: "Save folder" }).click();
+  await expect(page.getByRole("button", { name: "Critical services" })).toBeVisible();
 
   await page.goto("/app/dashboards/dashboard-1");
   await page.getByRole("button", { name: "Manage variables" }).click();
@@ -156,6 +168,10 @@ test("creates a folder and a persisted dashboard variable", async ({ page }) => 
   await page.getByLabel(/Options/).fill("Production=prod\nQA=qa");
   await page.getByRole("button", { name: "Add variable" }).click();
   await expect(page.getByText(/environment · custom · 2 options/)).toBeVisible();
+  await page.getByRole("button", { name: "Edit Environment" }).click();
+  await page.getByLabel("Label").fill("Deployment environment");
+  await page.getByRole("button", { name: "Save variable" }).click();
+  await expect(page.getByText("Deployment environment")).toBeVisible();
 });
 
 test("adds, edits and deletes a real panel definition", async ({ page }) => {

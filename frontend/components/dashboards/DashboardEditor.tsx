@@ -83,6 +83,7 @@ export function DashboardEditor({ dashboardId }: { dashboardId: string }) {
   const [variableDraft, setVariableDraft] = useState<VariableDraft>(emptyVariable);
   const [variableValues, setVariableValues] = useState<Record<string, string>>({});
   const [folders, setFolders] = useState<DashboardFolder[]>([]);
+  const [editingVariable, setEditingVariable] = useState<DashboardVariable | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -225,23 +226,46 @@ export function DashboardEditor({ dashboardId }: { dashboardId: string }) {
     if (!options.length) return setError("Add at least one variable option.");
     setSaving(true);
     try {
-      const response = await api.post<DashboardVariable>(`/dashboards/${dashboard.id}/variables`, {
+      const payload = {
         name: variableDraft.name,
         label: variableDraft.label,
         variable_type: variableDraft.variable_type,
         options,
         default_value: variableDraft.default_value || options[0].value,
         sort_order: dashboard.variables.length,
-      });
-      setDashboard({ ...dashboard, variables: [...dashboard.variables, response.data] });
+      };
+      const response = editingVariable
+        ? await api.patch<DashboardVariable>(`/dashboards/${dashboard.id}/variables/${editingVariable.id}`, {
+            label: payload.label,
+            variable_type: payload.variable_type,
+            options: payload.options,
+            default_value: payload.default_value,
+            sort_order: editingVariable.sort_order,
+          })
+        : await api.post<DashboardVariable>(`/dashboards/${dashboard.id}/variables`, payload);
+      setDashboard({ ...dashboard, variables: editingVariable
+        ? dashboard.variables.map((item) => item.id === response.data.id ? response.data : item)
+        : [...dashboard.variables, response.data] });
       setVariableValues((current) => ({ ...current, [response.data.name]: response.data.default_value || response.data.options[0].value }));
       setVariableDraft(emptyVariable);
+      setEditingVariable(null);
       setError(null);
     } catch (requestError) {
       setError(errorMessage(requestError));
     } finally {
       setSaving(false);
     }
+  }
+
+  function editVariable(variable: DashboardVariable) {
+    setEditingVariable(variable);
+    setVariableDraft({
+      name: variable.name,
+      label: variable.label,
+      variable_type: variable.variable_type,
+      options: variable.options.map((option) => `${option.label}=${option.value}`).join("\n"),
+      default_value: variable.default_value || "",
+    });
   }
 
   async function removeVariable(variable: DashboardVariable) {
@@ -340,14 +364,14 @@ export function DashboardEditor({ dashboardId }: { dashboardId: string }) {
       {variableDialog && (
         <div className={styles.dialogBackdrop} role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) setVariableDialog(false); }}>
           <div className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="variables-title">
-            <div className={styles.dialogHeader}><div><h2 id="variables-title">Dashboard variables</h2><p>Create safe, predefined filters for metric panels.</p></div><button className={styles.iconButton} type="button" onClick={() => setVariableDialog(false)} aria-label="Close"><X size={16} /></button></div>
-            {dashboard.variables.length > 0 && <div className={styles.variableList}>{dashboard.variables.map((variable) => <div key={variable.id}><span><strong>{variable.label}</strong><small>{variable.name} · {variable.variable_type} · {variable.options.length} options</small></span><button className={styles.iconButton} type="button" aria-label={`Delete ${variable.label}`} onClick={() => void removeVariable(variable)}><Trash2 size={13} /></button></div>)}</div>}
+            <div className={styles.dialogHeader}><div><h2 id="variables-title">Dashboard variables</h2><p>Create safe, predefined filters for metric panels.</p></div><button className={styles.iconButton} type="button" onClick={() => { setVariableDialog(false); setEditingVariable(null); setVariableDraft(emptyVariable); }} aria-label="Close"><X size={16} /></button></div>
+            {dashboard.variables.length > 0 && <div className={styles.variableList}>{dashboard.variables.map((variable) => <div key={variable.id}><span><strong>{variable.label}</strong><small>{variable.name} · {variable.variable_type} · {variable.options.length} options</small></span><div className={styles.panelActions}><button className={styles.iconButton} type="button" aria-label={`Edit ${variable.label}`} onClick={() => editVariable(variable)}><Edit3 size={13} /></button><button className={styles.iconButton} type="button" aria-label={`Delete ${variable.label}`} onClick={() => void removeVariable(variable)}><Trash2 size={13} /></button></div></div>)}</div>}
             <form className={styles.form} onSubmit={createVariable}>
-              <div className={styles.formRow}><label className={styles.field}>Name<input required pattern="[a-z][a-z0-9_]{0,59}" placeholder="server" value={variableDraft.name} onChange={(event) => setVariableDraft({ ...variableDraft, name: event.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "_") })} /></label><label className={styles.field}>Label<input required maxLength={120} placeholder="Server" value={variableDraft.label} onChange={(event) => setVariableDraft({ ...variableDraft, label: event.target.value })} /></label></div>
+              <div className={styles.formRow}><label className={styles.field}>Name<input required disabled={Boolean(editingVariable)} pattern="[a-z][a-z0-9_]{0,59}" placeholder="server" value={variableDraft.name} onChange={(event) => setVariableDraft({ ...variableDraft, name: event.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "_") })} /></label><label className={styles.field}>Label<input required maxLength={120} placeholder="Server" value={variableDraft.label} onChange={(event) => setVariableDraft({ ...variableDraft, label: event.target.value })} /></label></div>
               <label className={styles.field}>Type<select value={variableDraft.variable_type} onChange={(event) => setVariableDraft({ ...variableDraft, variable_type: event.target.value as DashboardVariable["variable_type"] })}>{["custom", "server", "container", "mount_point"].map((value) => <option key={value}>{value}</option>)}</select></label>
               <label className={styles.field}>Options (one per line: Label=value)<textarea required placeholder={"Production server=server-uuid\nQA server=server-uuid"} value={variableDraft.options} onChange={(event) => setVariableDraft({ ...variableDraft, options: event.target.value })} /></label>
               <label className={styles.field}>Default value (optional)<input maxLength={255} value={variableDraft.default_value} onChange={(event) => setVariableDraft({ ...variableDraft, default_value: event.target.value })} /></label>
-              <div className={styles.dialogActions}><button className={styles.secondary} type="button" onClick={() => setVariableDialog(false)}>Close</button><button className={styles.primary} disabled={saving || !variableDraft.name || !variableDraft.label || !variableDraft.options.trim()}>{saving ? "Saving…" : "Add variable"}</button></div>
+              <div className={styles.dialogActions}>{editingVariable && <button className={styles.secondary} type="button" onClick={() => { setEditingVariable(null); setVariableDraft(emptyVariable); }}>Cancel edit</button>}<button className={styles.secondary} type="button" onClick={() => setVariableDialog(false)}>Close</button><button className={styles.primary} disabled={saving || !variableDraft.name || !variableDraft.label || !variableDraft.options.trim()}>{saving ? "Saving…" : editingVariable ? "Save variable" : "Add variable"}</button></div>
             </form>
           </div>
         </div>
