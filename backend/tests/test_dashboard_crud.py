@@ -11,7 +11,7 @@ from sqlalchemy.dialects import postgresql
 from app.api.v1 import dashboards as dashboard_api
 from app.api.v1.auth import get_current_user
 from app.database import get_db
-from app.models.dashboard import Dashboard, Panel
+from app.models.dashboard import Dashboard, DashboardFolder, DashboardVariable, Panel
 from app.models.platform import OrganizationMember
 from app.models.user import User
 
@@ -26,6 +26,9 @@ class FakeResult:
 
     def all(self):
         return self.rows
+
+    def scalars(self):
+        return self
 
 
 class FakeSession:
@@ -88,6 +91,9 @@ def test_models_have_organization_and_cascade_contracts():
         for constraint in Dashboard.__table__.constraints
     )
     assert Panel.__table__.c.query_config.type.__class__.__name__ == "JSONB"
+    assert Dashboard.__table__.c.folder_id.foreign_keys
+    assert DashboardFolder.__table__.c.organization_id.nullable is False
+    assert DashboardVariable.__table__.c.options.type.__class__.__name__ == "JSONB"
 
 
 def test_panel_schema_rejects_unknown_metrics_raw_queries_and_invalid_grid():
@@ -124,6 +130,32 @@ def test_panel_schema_rejects_unknown_metrics_raw_queries_and_invalid_grid():
             metric_name="cpu_percent",
             query_config={"group_by": "container"},
             grid_position={"x": 0, "y": 0, "width": 12, "height": 6},
+        )
+
+
+def test_variable_schema_requires_safe_names_options_and_typed_values():
+    server_id = str(uuid.uuid4())
+    variable = dashboard_api.VariableCreate(
+        name="server",
+        label="Server",
+        variable_type="server",
+        options=[{"label": "Production", "value": server_id}],
+        default_value=server_id,
+    )
+    assert variable.default_value == server_id
+    with pytest.raises(ValidationError, match="UUIDs"):
+        dashboard_api.VariableCreate(
+            name="server",
+            label="Server",
+            variable_type="server",
+            options=[{"label": "Unsafe", "value": "not-an-id"}],
+        )
+    with pytest.raises(ValidationError, match="default"):
+        dashboard_api.VariableCreate(
+            name="environment",
+            label="Environment",
+            options=[{"label": "Prod", "value": "prod"}],
+            default_value="qa",
         )
 
 
@@ -192,6 +224,13 @@ def test_router_exposes_complete_dashboard_and_panel_crud():
         ("/dashboards/{dashboard_id}/panels/{panel_id}", "PATCH"),
         ("/dashboards/{dashboard_id}/panels/{panel_id}", "DELETE"),
         ("/dashboards/{dashboard_id}/panels/{panel_id}/data", "GET"),
+        ("/dashboards/folders", "GET"),
+        ("/dashboards/folders", "POST"),
+        ("/dashboards/folders/{folder_id}", "PATCH"),
+        ("/dashboards/folders/{folder_id}", "DELETE"),
+        ("/dashboards/{dashboard_id}/variables", "POST"),
+        ("/dashboards/{dashboard_id}/variables/{variable_id}", "PATCH"),
+        ("/dashboards/{dashboard_id}/variables/{variable_id}", "DELETE"),
     }
     assert expected <= all_routes
 
@@ -228,6 +267,7 @@ async def test_panel_data_is_allowlisted_downsampled_and_read_only(monkeypatch):
     db = FakeSession([
         FakeResult(scalar=dashboard),
         FakeResult(scalar=panel),
+        FakeResult(rows=[]),
         FakeResult(rows=[(sampled_at, 42.125, server_id)]),
     ])
 
@@ -236,7 +276,12 @@ async def test_panel_data_is_allowlisted_downsampled_and_read_only(monkeypatch):
 
     monkeypatch.setattr(dashboard_api, "current_membership", fake_membership)
     response = await dashboard_api.get_panel_data(
-        dashboard.id, panel.id, "1h", current_user, db,
+        dashboard_id=dashboard.id,
+        panel_id=panel.id,
+        time_range="1h",
+        variable_values=[],
+        user=current_user,
+        db=db,
     )
 
     assert response["bucket_seconds"] == 15

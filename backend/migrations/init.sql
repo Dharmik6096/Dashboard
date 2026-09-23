@@ -53,10 +53,24 @@ CREATE TABLE IF NOT EXISTS contact_requests (
 );
 
 -- V2.3 persisted dashboard builder
+CREATE TABLE IF NOT EXISTS dashboard_folders (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    title VARCHAR(120) NOT NULL,
+    slug VARCHAR(140) NOT NULL,
+    description TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_dashboard_folder_org_slug UNIQUE (organization_id, slug)
+);
+CREATE INDEX IF NOT EXISTS ix_dashboard_folders_organization_id ON dashboard_folders(organization_id);
+
 CREATE TABLE IF NOT EXISTS dashboards (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
     created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    folder_id UUID REFERENCES dashboard_folders(id) ON DELETE SET NULL,
     title VARCHAR(160) NOT NULL,
     slug VARCHAR(180) NOT NULL,
     description TEXT,
@@ -69,6 +83,7 @@ CREATE TABLE IF NOT EXISTS dashboards (
     CONSTRAINT ck_dashboard_refresh_interval CHECK (refresh_interval_seconds IN (0,5,10,30,60,300))
 );
 CREATE INDEX IF NOT EXISTS ix_dashboards_organization_id ON dashboards(organization_id);
+CREATE INDEX IF NOT EXISTS ix_dashboards_folder_id ON dashboards(folder_id);
 
 CREATE TABLE IF NOT EXISTS dashboard_panels (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -91,6 +106,22 @@ CREATE TABLE IF NOT EXISTS dashboard_panels (
     CONSTRAINT ck_panel_aggregation CHECK (aggregation IN ('avg','min','max','sum','count','p95'))
 );
 CREATE INDEX IF NOT EXISTS ix_dashboard_panels_dashboard_id ON dashboard_panels(dashboard_id);
+
+CREATE TABLE IF NOT EXISTS dashboard_variables (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    dashboard_id UUID NOT NULL REFERENCES dashboards(id) ON DELETE CASCADE,
+    name VARCHAR(60) NOT NULL,
+    label VARCHAR(120) NOT NULL,
+    variable_type VARCHAR(30) NOT NULL DEFAULT 'custom',
+    options JSONB NOT NULL DEFAULT '[]'::jsonb,
+    default_value VARCHAR(255),
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_dashboard_variable_name UNIQUE (dashboard_id, name),
+    CONSTRAINT ck_dashboard_variable_type CHECK (variable_type IN ('custom','server','container','mount_point'))
+);
+CREATE INDEX IF NOT EXISTS ix_dashboard_variables_dashboard_id ON dashboard_variables(dashboard_id);
 
 -- Servers
 CREATE TABLE IF NOT EXISTS servers (
