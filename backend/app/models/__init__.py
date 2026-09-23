@@ -11,6 +11,7 @@ from app.models.platform import (
     Organization, OrganizationMember, Subscription, RefreshSession,
     PasswordResetToken, ContactRequest,
 )
+from app.models.dashboard import Dashboard, Panel
 
 __all__ = [
     "User", "Server", "Container", "ContainerEvent",
@@ -21,4 +22,5 @@ __all__ = [
     "APIKey", "SecuritySettings", "NotificationPreferences",
     "Organization", "OrganizationMember", "Subscription", "RefreshSession",
     "PasswordResetToken", "ContactRequest",
+    "Dashboard", "Panel",
 ]
