@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { Clock3, LayoutDashboard, Plus, Search, ShieldCheck, Trash2, X } from "lucide-react";
+import { Clock3, Folder, FolderPlus, LayoutDashboard, Plus, Search, ShieldCheck, Trash2, X } from "lucide-react";
 
 import api from "@/lib/api";
-import { canEditDashboards, DashboardSummary } from "@/lib/dashboard-types";
+import { canEditDashboards, DashboardFolder, DashboardSummary } from "@/lib/dashboard-types";
 import { routes } from "@/lib/routes";
 import styles from "./DashboardWorkspace.module.css";
 
@@ -14,6 +14,7 @@ type Draft = {
   description: string;
   default_time_range: string;
   refresh_interval_seconds: number;
+  folder_id: string;
 };
 
 const emptyDraft: Draft = {
@@ -21,6 +22,7 @@ const emptyDraft: Draft = {
   description: "",
   default_time_range: "1h",
   refresh_interval_seconds: 30,
+  folder_id: "",
 };
 
 function errorMessage(error: unknown): string {
@@ -33,6 +35,7 @@ function errorMessage(error: unknown): string {
 
 export function DashboardLibrary() {
   const [dashboards, setDashboards] = useState<DashboardSummary[]>([]);
+  const [folders, setFolders] = useState<DashboardFolder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -40,15 +43,21 @@ export function DashboardLibrary() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [saving, setSaving] = useState(false);
+  const [folderDialog, setFolderDialog] = useState(false);
+  const [folderTitle, setFolderTitle] = useState("");
+  const [folderDescription, setFolderDescription] = useState("");
+  const [selectedFolder, setSelectedFolder] = useState("all");
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [dashboardResponse, identityResponse] = await Promise.all([
+      const [dashboardResponse, folderResponse, identityResponse] = await Promise.all([
         api.get<DashboardSummary[]>("/dashboards"),
+        api.get<DashboardFolder[]>("/dashboards/folders"),
         api.get("/auth/me"),
       ]);
       setDashboards(dashboardResponse.data);
+      setFolders(folderResponse.data);
       setRole(identityResponse.data.workspace?.role || "viewer");
       setError(null);
     } catch (requestError) {
@@ -62,17 +71,18 @@ export function DashboardLibrary() {
 
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    if (!needle) return dashboards;
-    return dashboards.filter((dashboard) =>
-      `${dashboard.title} ${dashboard.description || ""}`.toLowerCase().includes(needle),
-    );
-  }, [dashboards, query]);
+    return dashboards.filter((dashboard) => {
+      const inFolder = selectedFolder === "all"
+        || (selectedFolder === "unfiled" ? !dashboard.folder_id : dashboard.folder_id === selectedFolder);
+      return inFolder && (!needle || `${dashboard.title} ${dashboard.description || ""}`.toLowerCase().includes(needle));
+    });
+  }, [dashboards, query, selectedFolder]);
 
   async function createDashboard(event: FormEvent) {
     event.preventDefault();
     setSaving(true);
     try {
-      const response = await api.post<DashboardSummary>("/dashboards", draft);
+      const response = await api.post<DashboardSummary>("/dashboards", { ...draft, folder_id: draft.folder_id || null });
       setDashboards((current) => [response.data, ...current]);
       setDraft(emptyDraft);
       setDialogOpen(false);
@@ -81,6 +91,37 @@ export function DashboardLibrary() {
       setError(errorMessage(requestError));
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function createFolder(event: FormEvent) {
+    event.preventDefault();
+    setSaving(true);
+    try {
+      const response = await api.post<DashboardFolder>("/dashboards/folders", { title: folderTitle, description: folderDescription || null });
+      setFolders((current) => [...current, response.data].sort((a, b) => a.title.localeCompare(b.title)));
+      setFolderTitle("");
+      setFolderDescription("");
+      setFolderDialog(false);
+      setSelectedFolder(response.data.id);
+      setError(null);
+    } catch (requestError) {
+      setError(errorMessage(requestError));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function removeSelectedFolder() {
+    const folder = folders.find((item) => item.id === selectedFolder);
+    if (!folder || !window.confirm(`Delete folder “${folder.title}”? Dashboards will become unfiled.`)) return;
+    try {
+      await api.delete(`/dashboards/folders/${folder.id}`);
+      setFolders((current) => current.filter((item) => item.id !== folder.id));
+      setDashboards((current) => current.map((item) => item.folder_id === folder.id ? { ...item, folder_id: null } : item));
+      setSelectedFolder("all");
+    } catch (requestError) {
+      setError(errorMessage(requestError));
     }
   }
 
@@ -113,6 +154,14 @@ export function DashboardLibrary() {
       </div>
 
       {error && <div className={styles.error} role="alert">{error}</div>}
+
+      <div className={styles.folderBar} aria-label="Dashboard folders">
+        <button className={selectedFolder === "all" ? styles.folderActive : ""} type="button" onClick={() => setSelectedFolder("all")}><LayoutDashboard size={14} /> All</button>
+        <button className={selectedFolder === "unfiled" ? styles.folderActive : ""} type="button" onClick={() => setSelectedFolder("unfiled")}><Folder size={14} /> Unfiled</button>
+        {folders.map((folder) => <button className={selectedFolder === folder.id ? styles.folderActive : ""} type="button" key={folder.id} onClick={() => setSelectedFolder(folder.id)}><Folder size={14} /> {folder.title}</button>)}
+        {editable && <button type="button" onClick={() => setFolderDialog(true)}><FolderPlus size={14} /> New folder</button>}
+        {editable && folders.some((folder) => folder.id === selectedFolder) && <button className={styles.folderDanger} type="button" onClick={() => void removeSelectedFolder()}><Trash2 size={13} /> Delete folder</button>}
+      </div>
 
       <div className={styles.toolbar}>
         <label style={{ position: "relative", width: "min(420px, 100%)" }}>
@@ -169,7 +218,21 @@ export function DashboardLibrary() {
                 <label className={styles.field}>Default range<select value={draft.default_time_range} onChange={(event) => setDraft({ ...draft, default_time_range: event.target.value })}>{["15m", "1h", "6h", "24h", "7d", "30d"].map((value) => <option key={value}>{value}</option>)}</select></label>
                 <label className={styles.field}>Refresh<select value={draft.refresh_interval_seconds} onChange={(event) => setDraft({ ...draft, refresh_interval_seconds: Number(event.target.value) })}>{[[0, "Off"], [5, "5 seconds"], [10, "10 seconds"], [30, "30 seconds"], [60, "1 minute"], [300, "5 minutes"]].map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
               </div>
+              <label className={styles.field}>Folder<select value={draft.folder_id} onChange={(event) => setDraft({ ...draft, folder_id: event.target.value })}><option value="">Unfiled</option>{folders.map((folder) => <option value={folder.id} key={folder.id}>{folder.title}</option>)}</select></label>
               <div className={styles.dialogActions}><button className={styles.secondary} type="button" onClick={() => setDialogOpen(false)}>Cancel</button><button className={styles.primary} disabled={saving || !draft.title.trim()}>{saving ? "Creating…" : "Create dashboard"}</button></div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {folderDialog && (
+        <div className={styles.dialogBackdrop} role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) setFolderDialog(false); }}>
+          <div className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="new-folder-title">
+            <div className={styles.dialogHeader}><div><h2 id="new-folder-title">Create folder</h2><p>Organize dashboards inside this workspace.</p></div><button className={styles.iconButton} type="button" onClick={() => setFolderDialog(false)} aria-label="Close"><X size={16} /></button></div>
+            <form className={styles.form} onSubmit={createFolder}>
+              <label className={styles.field}>Folder name<input autoFocus required maxLength={120} value={folderTitle} onChange={(event) => setFolderTitle(event.target.value)} /></label>
+              <label className={styles.field}>Description<textarea maxLength={1000} value={folderDescription} onChange={(event) => setFolderDescription(event.target.value)} /></label>
+              <div className={styles.dialogActions}><button className={styles.secondary} type="button" onClick={() => setFolderDialog(false)}>Cancel</button><button className={styles.primary} disabled={saving || !folderTitle.trim()}>{saving ? "Creating…" : "Create folder"}</button></div>
             </form>
           </div>
         </div>

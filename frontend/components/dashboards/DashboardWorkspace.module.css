@@ -11,6 +11,10 @@
 .secondary { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 38px; padding: 0 14px; border: 1px solid var(--border); border-radius: 9px; color: var(--text-primary); background: var(--bg-elevated); }
 .danger { padding: 8px 12px; border: 1px solid rgba(239,68,68,.3); border-radius: 9px; color: #fca5a5; background: rgba(127,29,29,.16); }
 .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.folderBar { display: flex; align-items: center; gap: 8px; overflow-x: auto; padding: 10px; border: 1px solid var(--border); border-radius: 12px; background: rgba(15,23,42,.5); }
+.folderBar button { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 6px; min-height: 34px; padding: 0 11px; border: 1px solid transparent; border-radius: 8px; color: var(--text-secondary); background: transparent; cursor: pointer; }
+.folderBar button:hover, .folderBar .folderActive { border-color: rgba(96,165,250,.3); color: #dbeafe; background: rgba(37,99,235,.12); }
+.folderBar .folderDanger { margin-left: auto; color: #fca5a5; }
 .search { width: min(420px, 100%); min-height: 40px; padding: 0 14px; border: 1px solid var(--border); border-radius: 10px; color: var(--text-primary); background: var(--bg-input); outline: none; }
 .search:focus { border-color: var(--color-blue); box-shadow: 0 0 0 3px rgba(59,130,246,.14); }
 .count { color: var(--text-muted); font-size: 12px; }
@@ -47,6 +51,14 @@
 .editorHeader p { margin-top: 7px; color: var(--text-secondary); font-size: 13px; }
 .headerActions { display: flex; gap: 9px; }
 .notice { display: flex; align-items: center; gap: 9px; padding: 12px 14px; border: 1px solid rgba(59,130,246,.24); border-radius: 10px; color: #bfdbfe; background: rgba(30,64,175,.1); font-size: 12px; }
+.variableBar { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; color: var(--text-muted); background: rgba(15,23,42,.45); font-size: 11px; }
+.variableBar > label { display: grid; gap: 5px; min-width: 150px; color: var(--text-secondary); }
+.variableBar select { min-height: 34px; padding: 0 9px; border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); background: var(--bg-input); }
+.variableBar .secondary { margin-left: auto; }
+.variableList { display: grid; gap: 8px; margin-bottom: 18px; }
+.variableList > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 9px; background: rgba(15,23,42,.45); }
+.variableList span { display: grid; gap: 3px; }
+.variableList small { color: var(--text-muted); font-size: 10px; }
 .panelGrid { display: grid; grid-template-columns: repeat(24, minmax(0, 1fr)); grid-auto-flow: dense; gap: 14px; }
 .panel { position: relative; display: flex; flex-direction: column; min-height: 210px; padding: 17px; border: 1px solid var(--border); border-radius: 14px; background: linear-gradient(155deg, rgba(30,41,59,.75), rgba(15,23,42,.9)); box-shadow: 0 14px 32px rgba(2,6,23,.18); }
 .panelHeader { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }

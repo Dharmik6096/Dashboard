@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, BarChart3, Edit3, Gauge, LineChart, Plus, Save, ShieldCheck, Table2, Trash2, X } from "lucide-react";
+import { ArrowLeft, BarChart3, Edit3, Gauge, LineChart, Plus, Save, ShieldCheck, SlidersHorizontal, Table2, Trash2, X } from "lucide-react";
 
 import api from "@/lib/api";
-import { canEditDashboards, DashboardDetail, DashboardPanel } from "@/lib/dashboard-types";
+import { canEditDashboards, DashboardDetail, DashboardFolder, DashboardPanel, DashboardVariable } from "@/lib/dashboard-types";
 import { routes } from "@/lib/routes";
 import { PanelVisualization } from "./PanelVisualization";
 import styles from "./DashboardWorkspace.module.css";
@@ -27,6 +27,7 @@ type PanelDraft = {
   unit: string;
   width: number;
   height: number;
+  filter_variable: string;
 };
 
 const emptyPanel = (): PanelDraft => ({
@@ -39,7 +40,18 @@ const emptyPanel = (): PanelDraft => ({
   unit: "%",
   width: 12,
   height: 6,
+  filter_variable: "",
 });
+
+type VariableDraft = {
+  name: string;
+  label: string;
+  variable_type: DashboardVariable["variable_type"];
+  options: string;
+  default_value: string;
+};
+
+const emptyVariable: VariableDraft = { name: "", label: "", variable_type: "custom", options: "", default_value: "" };
 
 function errorMessage(error: unknown): string {
   if (typeof error === "object" && error && "response" in error) {
@@ -63,16 +75,21 @@ export function DashboardEditor({ dashboardId }: { dashboardId: string }) {
   const [role, setRole] = useState("viewer");
   const [panelDialog, setPanelDialog] = useState(false);
   const [settingsDialog, setSettingsDialog] = useState(false);
+  const [variableDialog, setVariableDialog] = useState(false);
   const [editingPanel, setEditingPanel] = useState<DashboardPanel | null>(null);
   const [panelDraft, setPanelDraft] = useState<PanelDraft>(emptyPanel());
-  const [settingsDraft, setSettingsDraft] = useState({ title: "", description: "", default_time_range: "1h", refresh_interval_seconds: 30 });
+  const [settingsDraft, setSettingsDraft] = useState({ title: "", description: "", default_time_range: "1h", refresh_interval_seconds: 30, folder_id: "" });
   const [saving, setSaving] = useState(false);
+  const [variableDraft, setVariableDraft] = useState<VariableDraft>(emptyVariable);
+  const [variableValues, setVariableValues] = useState<Record<string, string>>({});
+  const [folders, setFolders] = useState<DashboardFolder[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [dashboardResponse, identityResponse] = await Promise.all([
+      const [dashboardResponse, folderResponse, identityResponse] = await Promise.all([
         api.get<DashboardDetail>(`/dashboards/${dashboardId}`),
+        api.get<DashboardFolder[]>("/dashboards/folders"),
         api.get("/auth/me"),
       ]);
       setDashboard(dashboardResponse.data);
@@ -81,8 +98,11 @@ export function DashboardEditor({ dashboardId }: { dashboardId: string }) {
         description: dashboardResponse.data.description || "",
         default_time_range: dashboardResponse.data.default_time_range,
         refresh_interval_seconds: dashboardResponse.data.refresh_interval_seconds,
+        folder_id: dashboardResponse.data.folder_id || "",
       });
+      setFolders(folderResponse.data);
       setRole(identityResponse.data.workspace?.role || "viewer");
+      setVariableValues(Object.fromEntries(dashboardResponse.data.variables.map((variable) => [variable.name, variable.default_value || variable.options[0]?.value || ""])));
       setError(null);
     } catch (requestError) {
       setError(errorMessage(requestError));
@@ -114,6 +134,7 @@ export function DashboardEditor({ dashboardId }: { dashboardId: string }) {
       unit: panel.unit || "",
       width: panel.grid_position.width,
       height: panel.grid_position.height,
+      filter_variable: panel.query_config.server_variable || panel.query_config.container_variable || panel.query_config.mount_point_variable || "",
     });
     setPanelDialog(true);
   }
@@ -130,7 +151,12 @@ export function DashboardEditor({ dashboardId }: { dashboardId: string }) {
       metric_name: panelDraft.metric_name,
       aggregation: panelDraft.aggregation,
       unit: panelDraft.unit || null,
-      query_config: editingPanel?.query_config || { server_id: null, container_id: null, mount_point: null, group_by: "none" },
+      query_config: {
+        ...(editingPanel?.query_config || { server_id: null, container_id: null, mount_point: null, group_by: "none" }),
+        server_variable: panelDraft.metric_source === "server_metrics" ? panelDraft.filter_variable || null : null,
+        container_variable: panelDraft.metric_source === "container_metrics" ? panelDraft.filter_variable || null : null,
+        mount_point_variable: panelDraft.metric_source === "disk_metrics" ? panelDraft.filter_variable || null : null,
+      },
       grid_position: {
         x: editingPanel?.grid_position.x || 0,
         y: editingPanel?.grid_position.y ?? nextY,
@@ -177,7 +203,7 @@ export function DashboardEditor({ dashboardId }: { dashboardId: string }) {
     if (!dashboard) return;
     setSaving(true);
     try {
-      const response = await api.patch<DashboardDetail>(`/dashboards/${dashboard.id}`, settingsDraft);
+      const response = await api.patch<DashboardDetail>(`/dashboards/${dashboard.id}`, { ...settingsDraft, folder_id: settingsDraft.folder_id || null });
       setDashboard({ ...dashboard, ...response.data });
       setSettingsDialog(false);
       setError(null);
@@ -185,6 +211,48 @@ export function DashboardEditor({ dashboardId }: { dashboardId: string }) {
       setError(errorMessage(requestError));
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function createVariable(event: FormEvent) {
+    event.preventDefault();
+    if (!dashboard) return;
+    const options = variableDraft.options.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).map((line) => {
+      const [label, ...valueParts] = line.split("=");
+      const value = valueParts.length ? valueParts.join("=").trim() : label.trim();
+      return { label: label.trim(), value };
+    });
+    if (!options.length) return setError("Add at least one variable option.");
+    setSaving(true);
+    try {
+      const response = await api.post<DashboardVariable>(`/dashboards/${dashboard.id}/variables`, {
+        name: variableDraft.name,
+        label: variableDraft.label,
+        variable_type: variableDraft.variable_type,
+        options,
+        default_value: variableDraft.default_value || options[0].value,
+        sort_order: dashboard.variables.length,
+      });
+      setDashboard({ ...dashboard, variables: [...dashboard.variables, response.data] });
+      setVariableValues((current) => ({ ...current, [response.data.name]: response.data.default_value || response.data.options[0].value }));
+      setVariableDraft(emptyVariable);
+      setError(null);
+    } catch (requestError) {
+      setError(errorMessage(requestError));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function removeVariable(variable: DashboardVariable) {
+    if (!dashboard || !window.confirm(`Delete variable “${variable.label}”?`)) return;
+    try {
+      await api.delete(`/dashboards/${dashboard.id}/variables/${variable.id}`);
+      setDashboard({ ...dashboard, variables: dashboard.variables.filter((item) => item.id !== variable.id) });
+      setVariableValues((current) => { const next = { ...current }; delete next[variable.name]; return next; });
+      setError(null);
+    } catch (requestError) {
+      setError(errorMessage(requestError));
     }
   }
 
@@ -211,6 +279,12 @@ export function DashboardEditor({ dashboardId }: { dashboardId: string }) {
       {error && <div className={styles.error} role="alert">{error}</div>}
       <div className={styles.notice}><ShieldCheck size={15} /> Panel definitions are read-only metric queries. They cannot run shell commands or change monitored servers.</div>
 
+      <div className={styles.variableBar} aria-label="Dashboard variables">
+        <SlidersHorizontal size={15} />
+        {dashboard.variables.length ? dashboard.variables.map((variable) => <label key={variable.id}><span>{variable.label}</span><select value={variableValues[variable.name] || ""} onChange={(event) => setVariableValues((current) => ({ ...current, [variable.name]: event.target.value }))}>{variable.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>) : <span>No variables configured</span>}
+        {editable && <button className={styles.secondary} type="button" onClick={() => setVariableDialog(true)}>Manage variables</button>}
+      </div>
+
       {dashboard.panels.length === 0 ? (
         <div className={styles.empty}>
           <LayoutDashboardIcon />
@@ -229,7 +303,7 @@ export function DashboardEditor({ dashboardId }: { dashboardId: string }) {
               </div>
               <div className={styles.panelBody}>
                 <span className={styles.metricKind}><Icon size={13} /> {panel.metric_source}</span>
-                <PanelVisualization dashboardId={dashboard.id} panel={panel} timeRange={dashboard.default_time_range} refreshSeconds={dashboard.refresh_interval_seconds} />
+                <PanelVisualization dashboardId={dashboard.id} panel={panel} timeRange={dashboard.default_time_range} refreshSeconds={dashboard.refresh_interval_seconds} variableValues={variableValues} />
               </div>
             </article>;
           })}
@@ -247,8 +321,9 @@ export function DashboardEditor({ dashboardId }: { dashboardId: string }) {
                 <label className={styles.field}>Visualization<select value={panelDraft.visualization} onChange={(event) => setPanelDraft({ ...panelDraft, visualization: event.target.value as PanelDraft["visualization"] })}>{["time_series", "stat", "gauge", "bar", "table"].map((value) => <option key={value} value={value}>{value.replace("_", " ")}</option>)}</select></label>
                 <label className={styles.field}>Aggregation<select value={panelDraft.aggregation} onChange={(event) => setPanelDraft({ ...panelDraft, aggregation: event.target.value as PanelDraft["aggregation"] })}>{["avg", "min", "max", "sum", "count", "p95"].map((value) => <option key={value}>{value}</option>)}</select></label>
               </div>
+              <label className={styles.field}>Filter variable<select value={panelDraft.filter_variable} onChange={(event) => setPanelDraft({ ...panelDraft, filter_variable: event.target.value })}><option value="">No variable filter</option>{dashboard.variables.filter((variable) => variable.variable_type === (panelDraft.metric_source === "server_metrics" ? "server" : panelDraft.metric_source === "container_metrics" ? "container" : "mount_point")).map((variable) => <option key={variable.id} value={variable.name}>{variable.label}</option>)}</select></label>
               <div className={styles.formRow}>
-                <label className={styles.field}>Metric source<select value={panelDraft.metric_source} onChange={(event) => { const source = event.target.value as MetricSource; setPanelDraft({ ...panelDraft, metric_source: source, metric_name: metricCatalog[source][0] }); }}>{Object.keys(metricCatalog).map((value) => <option key={value}>{value}</option>)}</select></label>
+                <label className={styles.field}>Metric source<select value={panelDraft.metric_source} onChange={(event) => { const source = event.target.value as MetricSource; setPanelDraft({ ...panelDraft, metric_source: source, metric_name: metricCatalog[source][0], filter_variable: "" }); }}>{Object.keys(metricCatalog).map((value) => <option key={value}>{value}</option>)}</select></label>
                 <label className={styles.field}>Metric<select value={panelDraft.metric_name} onChange={(event) => setPanelDraft({ ...panelDraft, metric_name: event.target.value })}>{metricCatalog[panelDraft.metric_source].map((value) => <option key={value}>{value}</option>)}</select></label>
               </div>
               <div className={styles.formRow}>
@@ -257,6 +332,22 @@ export function DashboardEditor({ dashboardId }: { dashboardId: string }) {
               </div>
               <label className={styles.field}>Unit<input maxLength={30} value={panelDraft.unit} onChange={(event) => setPanelDraft({ ...panelDraft, unit: event.target.value })} placeholder="%, bytes, cores…" /></label>
               <div className={styles.dialogActions}><button className={styles.secondary} type="button" onClick={() => setPanelDialog(false)}>Cancel</button><button className={styles.primary} disabled={saving || !panelDraft.title.trim()}><Save size={14} /> {saving ? "Saving…" : "Save panel"}</button></div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {variableDialog && (
+        <div className={styles.dialogBackdrop} role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) setVariableDialog(false); }}>
+          <div className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="variables-title">
+            <div className={styles.dialogHeader}><div><h2 id="variables-title">Dashboard variables</h2><p>Create safe, predefined filters for metric panels.</p></div><button className={styles.iconButton} type="button" onClick={() => setVariableDialog(false)} aria-label="Close"><X size={16} /></button></div>
+            {dashboard.variables.length > 0 && <div className={styles.variableList}>{dashboard.variables.map((variable) => <div key={variable.id}><span><strong>{variable.label}</strong><small>{variable.name} · {variable.variable_type} · {variable.options.length} options</small></span><button className={styles.iconButton} type="button" aria-label={`Delete ${variable.label}`} onClick={() => void removeVariable(variable)}><Trash2 size={13} /></button></div>)}</div>}
+            <form className={styles.form} onSubmit={createVariable}>
+              <div className={styles.formRow}><label className={styles.field}>Name<input required pattern="[a-z][a-z0-9_]{0,59}" placeholder="server" value={variableDraft.name} onChange={(event) => setVariableDraft({ ...variableDraft, name: event.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "_") })} /></label><label className={styles.field}>Label<input required maxLength={120} placeholder="Server" value={variableDraft.label} onChange={(event) => setVariableDraft({ ...variableDraft, label: event.target.value })} /></label></div>
+              <label className={styles.field}>Type<select value={variableDraft.variable_type} onChange={(event) => setVariableDraft({ ...variableDraft, variable_type: event.target.value as DashboardVariable["variable_type"] })}>{["custom", "server", "container", "mount_point"].map((value) => <option key={value}>{value}</option>)}</select></label>
+              <label className={styles.field}>Options (one per line: Label=value)<textarea required placeholder={"Production server=server-uuid\nQA server=server-uuid"} value={variableDraft.options} onChange={(event) => setVariableDraft({ ...variableDraft, options: event.target.value })} /></label>
+              <label className={styles.field}>Default value (optional)<input maxLength={255} value={variableDraft.default_value} onChange={(event) => setVariableDraft({ ...variableDraft, default_value: event.target.value })} /></label>
+              <div className={styles.dialogActions}><button className={styles.secondary} type="button" onClick={() => setVariableDialog(false)}>Close</button><button className={styles.primary} disabled={saving || !variableDraft.name || !variableDraft.label || !variableDraft.options.trim()}>{saving ? "Saving…" : "Add variable"}</button></div>
             </form>
           </div>
         </div>
@@ -273,6 +364,7 @@ export function DashboardEditor({ dashboardId }: { dashboardId: string }) {
                 <label className={styles.field}>Default range<select value={settingsDraft.default_time_range} onChange={(event) => setSettingsDraft({ ...settingsDraft, default_time_range: event.target.value })}>{["15m", "1h", "6h", "24h", "7d", "30d"].map((value) => <option key={value}>{value}</option>)}</select></label>
                 <label className={styles.field}>Refresh<select value={settingsDraft.refresh_interval_seconds} onChange={(event) => setSettingsDraft({ ...settingsDraft, refresh_interval_seconds: Number(event.target.value) })}>{[[0, "Off"], [5, "5 seconds"], [10, "10 seconds"], [30, "30 seconds"], [60, "1 minute"], [300, "5 minutes"]].map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
               </div>
+              <label className={styles.field}>Folder<select value={settingsDraft.folder_id} onChange={(event) => setSettingsDraft({ ...settingsDraft, folder_id: event.target.value })}><option value="">Unfiled</option>{folders.map((folder) => <option value={folder.id} key={folder.id}>{folder.title}</option>)}</select></label>
               <div className={styles.dialogActions}><button className={styles.secondary} type="button" onClick={() => setSettingsDialog(false)}>Cancel</button><button className={styles.primary} disabled={saving || !settingsDraft.title.trim()}><Save size={14} /> {saving ? "Saving…" : "Save changes"}</button></div>
             </form>
           </div>
