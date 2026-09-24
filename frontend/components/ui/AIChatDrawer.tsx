@@ -117,7 +117,7 @@ function renderInline(text: string): React.ReactNode {
 // ─── Main component ─────────────────────────────────────────────────────────
 const INIT_MSG: Message = {
   role: "ai",
-  text: "Hello! I'm **InfraSight AI**, your infrastructure assistant powered by GPT-4.\n\nI can help you with:\n- Diagnosing **CPU / Memory / Disk** issues\n- Debugging **Docker and containers**\n- Analyzing **network** problems\n- Triaging **alerts** and incidents\n- Running the right **Linux commands**\n\nDescribe what you're seeing and I'll guide you through it.",
+  text: "Hello! I'm **Ops AI**, a read-only troubleshooting assistant.\n\nI can help you with:\n- Interpreting **CPU / Memory / Disk** symptoms\n- Investigating **Docker and container** evidence\n- Reasoning about **network** problems\n- Triaging **alerts** and incidents\n- Identifying the next safe telemetry check\n\nI cannot execute commands or change your infrastructure.",
   time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 };
 
@@ -167,7 +167,7 @@ export function AIChatDrawer() {
       setConversationHistory([...updatedHistory, { role: "assistant", content: aiReply }]);
     } catch (err: unknown) {
       const aiTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      let errMsg = "Failed to get a response. Please check your OpenAI API key in `.env` and restart the backend.";
+      let errMsg = "Failed to get a response. Check the configured Gemini or Groq provider in the backend environment.";
       if (err && typeof err === 'object' && 'response' in err) {
         const axiosErr = err as { response?: { data?: { detail?: string }; status?: number } };
         if (axiosErr.response?.data?.detail) errMsg = axiosErr.response.data.detail;
@@ -220,7 +220,7 @@ export function AIChatDrawer() {
               <div style={{ fontSize: 14, fontWeight: 700, color: "#f0f4fc" }}>InfraSight AI</div>
               <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 2 }}>
                 <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#10b981" }} />
-                <div style={{ fontSize: 11, color: "#4b6280" }}>GPT-4 · Infrastructure Assistant</div>
+                <div style={{ fontSize: 11, color: "#4b6280" }}>Configured provider · Read-only assistant</div>
               </div>
             </div>
           </div>
@@ -299,7 +299,7 @@ export function AIChatDrawer() {
             </button>
           </div>
           <div style={{ fontSize: 10.5, color: "#2a3f58", textAlign: "center", marginTop: 8 }}>
-            Powered by OpenAI GPT-4 · Verify critical commands before applying to production
+            Read-only guidance · Validate conclusions against live telemetry
           </div>
         </div>
       </div>

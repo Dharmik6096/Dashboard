@@ -7,6 +7,7 @@ import type { Container, ContainerEvent } from "@/types";
 import { formatBytes, formatLastSeen } from "@/lib/formatters";
 import { TimeSeriesChart } from "@/components/ui/charts";
 import { LogViewer } from "@/components/ui";
+import { DashboardDataState } from "@/components/ui/DashboardDataState";
 import {
   Box, Activity, RefreshCw, Settings, ShieldAlert,
   RotateCcw, Network, Terminal, Info, ChevronLeft, Cpu, MemoryStick, Search, ArrowUpRight
@@ -31,14 +32,17 @@ export default function ContainerDetailPage() {
   const [activeTab, setActiveTab] = useState<Tab>("overview");
   const [loading, setLoading] = useState(true);
   const [tabLoading, setTabLoading] = useState(false);
+  const [baseError, setBaseError] = useState("");
+  const [tabError, setTabError] = useState("");
   const [period, setPeriod] = useState("1h");
 
   const loadBase = useCallback(async () => {
+    setBaseError("");
     try {
       const { data } = await api.get(`/containers/${id}`);
       setContainer(data);
     } catch {
-      //
+      setBaseError("Container details could not be loaded from the API.");
     } finally {
       setLoading(false);
     }
@@ -51,11 +55,14 @@ export default function ContainerDetailPage() {
         ...m,
         time: new Date(String(m.time)).toLocaleTimeString()
       })) as any);
-    } catch {}
+    } catch {
+      setTabError("Metric history could not be loaded for this container.");
+    }
   }, [id, period]);
 
   const loadTab = useCallback(async () => {
     setTabLoading(true);
+    setTabError("");
     try {
       if (activeTab === "processes") {
         const { data } = await api.get(`/containers/${id}/processes`);
@@ -76,7 +83,9 @@ export default function ContainerDetailPage() {
       } else if (activeTab === "metrics" || activeTab === "overview") {
         await loadMetrics();
       }
-    } catch {}
+    } catch {
+      setTabError(`The ${activeTab} data source could not be read for this container.`);
+    }
     setTabLoading(false);
   }, [id, activeTab, loadMetrics]);
 
@@ -94,13 +103,7 @@ export default function ContainerDetailPage() {
       <div style={{ fontSize: 18, color: "var(--text-secondary)", fontWeight: 500 }}>Loading Container Details...</div>
     </div>
   );
-  if (!container) return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 400, flexDirection: "column", gap: 16 }}>
-      <Box size={48} color="var(--color-critical)" opacity={0.5} />
-      <div style={{ fontSize: 20, color: "var(--color-critical)", fontWeight: 600 }}>Container Not Found</div>
-      <button onClick={() => router.push(routes.containers)} className="btn btn-secondary">Return to Containers</button>
-    </div>
-  );
+  if (!container) return <div style={{ maxWidth: 760, margin: "80px auto" }}><DashboardDataState kind="error" title="Container details unavailable" description={baseError || "The requested container was not returned by the API."} onRetry={loadBase} /><button onClick={() => router.push(routes.containers)} className="btn btn-secondary" style={{ marginTop: 12 }}>Return to Containers</button></div>;
 
   const isRunning = container.status === "running";
   const isExited = container.status === "exited" || container.status === "dead";
@@ -224,6 +227,8 @@ export default function ContainerDetailPage() {
           style={{ height: 3, background: "linear-gradient(90deg, transparent, var(--primary), transparent)", backgroundSize: "200% 100%", borderRadius: 2, marginTop: -24, animation: "gradientMove 2s linear infinite" }} 
         />
       )}
+
+      {tabError ? <DashboardDataState kind="error" title="Container tab unavailable" description={tabError} onRetry={loadTab} /> : null}
 
       {/* Tab Content */}
       <AnimatePresence mode="wait">

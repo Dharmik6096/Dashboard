@@ -1,11 +1,14 @@
 import hashlib
 import hmac
+import inspect
 import time
 
 import pytest
 from pydantic import ValidationError
 
 from app.api.v1.auth import SignupRequest
+from app.api.v1.auth import get_current_user
+from app.api.v1.ai import ai_chat
 from app.api.v1.billing import PLANS, safe_return_url, verify_stripe_signature
 from app.config import settings
 from app.core.security import create_access_token, create_refresh_token, decode_token
@@ -47,3 +50,7 @@ def test_plan_contract_is_stable():
     assert PLANS[0]["host_limit"] == 5
     assert PLANS[1]["price_monthly"] == 49
 
+
+def test_ai_chat_requires_authenticated_user():
+    user_dependency = inspect.signature(ai_chat).parameters["_user"].default
+    assert user_dependency.dependency is get_current_user

@@ -47,9 +47,11 @@ export default function NetworkDashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedInterface, setSelectedInterface] = useState<any>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState('');
 
   const fetchData = useCallback(async (showSpinner = false) => {
     if (showSpinner) setRefreshing(true);
+    setError('');
     const startTime = Date.now();
     try {
       const params = new URLSearchParams({ period });
@@ -59,6 +61,7 @@ export default function NetworkDashboard() {
       setData(res.data);
     } catch (e) {
       console.error('Network API error:', e);
+      setError('Network telemetry could not be loaded from the API.');
     } finally {
       setLoading(false);
       if (showSpinner) {
@@ -69,7 +72,7 @@ export default function NetworkDashboard() {
         setRefreshing(false);
       }
     }
-  }, [period]);
+  }, [period, envFilter, serverFilter]);
 
   useEffect(() => {
     setLoading(true);
@@ -104,7 +107,7 @@ export default function NetworkDashboard() {
             Network Dashboard
           </h1>
           <p style={{ color: 'var(--text-muted)', fontSize: 'var(--font-sm)', margin: '4px 0 0 0' }}>
-            Monitor live network traffic and interface health across all servers.
+            Monitor recorded server network rates across your selected infrastructure scope.
           </p>
         </div>
 
@@ -173,6 +176,7 @@ export default function NetworkDashboard() {
 
       {/* ── PAGE CONTENT ── */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        {error ? <div role="alert" className="alert alert-error">{error} <button type="button" onClick={() => fetchData(true)}>Retry</button></div> : null}
         
         {loading && !data ? (
           <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
@@ -191,10 +195,10 @@ export default function NetworkDashboard() {
               </div>
               <div className="metric-card">
                 <div className="metric-card-label">
-                  <Activity size={14} style={{ color: 'var(--color-purple)' }} /> Active Interfaces
+                  <Activity size={14} style={{ color: 'var(--color-purple)' }} /> Reporting Aggregates
                 </div>
                 <div className="metric-card-value">{summary?.active_interfaces ?? 0}</div>
-                <div className="metric-card-sub">Interfaces UP</div>
+                <div className="metric-card-sub">Server-level collectors</div>
               </div>
               <div className="metric-card">
                 <div className="metric-card-label">
@@ -219,18 +223,18 @@ export default function NetworkDashboard() {
                   <AlertTriangle size={14} style={{ color: 'var(--color-critical)' }} /> Network Errors
                 </div>
                 <div className="metric-card-value" style={{ color: (summary?.network_errors ?? 0) > 0 ? 'var(--color-critical)' : 'var(--text-primary)' }}>
-                  {summary?.network_errors ?? 0}
+                  {summary?.network_errors ?? '—'}
                 </div>
-                <div className="metric-card-sub">Across all interfaces</div>
+                <div className="metric-card-sub">Counter not collected</div>
               </div>
               <div className="metric-card">
                 <div className="metric-card-label">
                   <XCircle size={14} style={{ color: 'var(--color-warning)' }} /> Packet Drops
                 </div>
                 <div className="metric-card-value" style={{ color: (summary?.packet_drops ?? 0) > 0 ? 'var(--color-warning)' : 'var(--text-primary)' }}>
-                  {summary?.packet_drops ?? 0}
+                  {summary?.packet_drops ?? '—'}
                 </div>
-                <div className="metric-card-sub">Across all interfaces</div>
+                <div className="metric-card-sub">Counter not collected</div>
               </div>
             </div>
 
@@ -377,8 +381,8 @@ export default function NetworkDashboard() {
                         </td>
                         <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>{intf.rx.toFixed(2)}</td>
                         <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>{intf.tx.toFixed(2)}</td>
-                        <td style={{ padding: '12px 16px', textAlign: 'right', color: intf.errors > 0 ? 'var(--color-critical)' : 'var(--text-secondary)' }}>{intf.errors}</td>
-                        <td style={{ padding: '12px 16px', textAlign: 'right', color: intf.drops > 0 ? 'var(--color-warning)' : 'var(--text-secondary)' }}>{intf.drops}</td>
+                        <td style={{ padding: '12px 16px', textAlign: 'right', color: 'var(--text-secondary)' }}>{intf.errors ?? '—'}</td>
+                        <td style={{ padding: '12px 16px', textAlign: 'right', color: 'var(--text-secondary)' }}>{intf.drops ?? '—'}</td>
                       </tr>
                     )) : (
                       <tr>
@@ -410,9 +414,9 @@ export default function NetworkDashboard() {
                       { label: 'Status', value: null, badge: selectedInterface.status },
                       { label: 'RX', value: `${selectedInterface.rx.toFixed(2)} MB/s`, mono: true },
                       { label: 'TX', value: `${selectedInterface.tx.toFixed(2)} MB/s`, mono: true },
-                      { label: 'Errors', value: selectedInterface.errors },
-                      { label: 'Drops', value: selectedInterface.drops },
-                      { label: 'MTU', value: selectedInterface.mtu, mono: true },
+                      { label: 'Errors', value: selectedInterface.errors ?? 'Not collected' },
+                      { label: 'Drops', value: selectedInterface.drops ?? 'Not collected' },
+                      { label: 'MTU', value: selectedInterface.mtu ?? 'Not collected', mono: true },
                       { label: 'Last Seen', value: selectedInterface.last_seen ? new Date(selectedInterface.last_seen).toLocaleTimeString() : '–' },
                     ].map(row => (
                       <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '13px' }}>

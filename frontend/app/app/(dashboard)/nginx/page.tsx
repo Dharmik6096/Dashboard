@@ -4,8 +4,8 @@ import api from "@/lib/api";
 import { Globe, RefreshCw, AlertCircle, Server as ServerIcon, Network, FileText, Lock, Activity, ChevronLeft, ChevronRight, Search, ShieldAlert, Cpu, ArrowUpDown } from "lucide-react";
 import { SearchableCombobox } from "@/components/ui/SearchableCombobox";
 import { EnvironmentSelect } from "@/components/ui/EnvironmentSelect";
-import { TimeSeriesChart } from "@/components/ui/charts/TimeSeriesChart";
 import { PageTransition } from "@/components/ui/PageTransition";
+import { DashboardDataState } from "@/components/ui/DashboardDataState";
 
 export default function NginxPage() {
   const [environment, setEnvironment] = useState("All Environments");
@@ -201,9 +201,9 @@ export default function NginxPage() {
               <SummaryCard icon={ServerIcon} title="NGINX SERVERS" value={summary.nginx_servers} label="Reporting online" glow="var(--color-blue)" />
               <SummaryCard icon={Globe} title="VIRTUAL HOSTS" value={summary.server_blocks} label="Total configurations" />
               <SummaryCard icon={Network} title="UPSTREAM HEALTH" value={summary.total_upstreams > 0 ? `${summary.healthy_upstreams} / ${summary.total_upstreams}` : "0"} label="Healthy targets" glow={summary.healthy_upstreams < summary.total_upstreams ? "var(--color-warning)" : "var(--color-healthy)"} valueColor={summary.healthy_upstreams < summary.total_upstreams ? "var(--color-warning)" : "var(--color-healthy)"} />
-              <SummaryCard icon={Activity} title="LIVE REQ / SEC" value={summary.requests_per_second} label="Fleet aggregate" glow="var(--color-purple)" valueColor="var(--color-purple)" />
-              <SummaryCard icon={AlertCircle} title="ACTIVE ERRORS" value={summary.error_alerts} label="Requires attention" valueColor={summary.error_alerts > 0 ? "var(--color-critical)" : "inherit"} glow={summary.error_alerts > 0 ? "var(--color-critical)" : undefined} />
-              <SummaryCard icon={Lock} title="SSL EXPIRING" value={summary.ssl_expiring_soon} label="Within 30 days" valueColor={summary.ssl_expiring_soon > 0 ? "var(--color-warning)" : "inherit"} glow={summary.ssl_expiring_soon > 0 ? "var(--color-warning)" : undefined} />
+              <SummaryCard icon={Activity} title="LIVE REQ / SEC" value={summary.requests_per_second ?? "—"} label="Collector not configured" />
+              <SummaryCard icon={AlertCircle} title="HTTP ERRORS" value={summary.error_alerts ?? "—"} label="Collector not configured" />
+              <SummaryCard icon={Lock} title="SSL EXPIRING" value={summary.ssl_expiring_soon ?? "—"} label="Expiry collector not configured" />
             </div>
 
             {/* Live Traffic Chart */}
@@ -218,18 +218,7 @@ export default function NginxPage() {
                   Live Sync
                 </div>
               </div>
-              <div style={{ height: 250, width: "100%" }}>
-                <TimeSeriesChart
-                  data={data.traffic_history}
-                  series={[
-                    { key: "reqs", name: "Requests (req/s)", color: "var(--color-purple)", type: "area" },
-                    { key: "errs", name: "Errors (req/s)", color: "var(--color-critical)", type: "line" }
-                  ]}
-                  title=""
-                  height={250}
-                  yAxisWidth={40}
-                />
-              </div>
+              <DashboardDataState kind="empty" title="Traffic telemetry is not collected" description="Virtual hosts and proxy targets below come from parsed Nginx configuration. Add a read-only access-log collector before request and error charts can show verified data." />
             </div>
 
             {/* Main Content Layout */}
@@ -303,22 +292,22 @@ export default function NginxPage() {
                                   </div>
                                 </td>
                                 <td style={{ padding: "16px 20px", fontWeight: 700, color: "var(--text-primary)" }}>
-                                  {site.reqs} <span style={{ fontSize: 10, color: "var(--text-muted)", fontWeight: 500 }}>/s</span>
+                                  {site.reqs ?? "—"}{site.reqs != null ? <span style={{ fontSize: 10, color: "var(--text-muted)", fontWeight: 500 }}>/s</span> : null}
                                 </td>
                                 <td style={{ padding: "16px 20px" }}>
                                   <div style={{ display: "flex", flexDirection: "column", gap: 2, fontSize: 12 }}>
-                                    <span style={{ color: site.err_4xx > 0 ? "var(--color-warning)" : "var(--text-muted)" }}>
-                                      4xx: {site.err_4xx}
+                                    <span style={{ color: "var(--text-muted)" }}>
+                                      4xx: {site.err_4xx ?? "—"}
                                     </span>
-                                    <span style={{ color: site.err_5xx > 0 ? "var(--color-critical)" : "var(--text-muted)" }}>
-                                      5xx: {site.err_5xx}
+                                    <span style={{ color: "var(--text-muted)" }}>
+                                      5xx: {site.err_5xx ?? "—"}
                                     </span>
                                   </div>
                                 </td>
                                 <td style={{ padding: "16px 20px" }}>
-                                  {site.tls !== "—" ? (
-                                    <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, color: site.tls.includes("d") && parseInt(site.tls) < 30 ? "var(--color-warning)" : "var(--color-healthy)" }}>
-                                      <Lock size={12} /> Valid ({site.tls})
+                                  {site.tls === "configured" ? (
+                                    <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, color: "var(--color-healthy)" }}>
+                                      <Lock size={12} /> Configured
                                     </div>
                                   ) : (
                                     <span style={{ color: "var(--text-muted)", fontSize: 12 }}>—</span>
@@ -393,7 +382,7 @@ export default function NginxPage() {
                                   {u.healthy} / {u.total} up
                                 </div>
                               </td>
-                              <td style={{ padding: "12px 20px", color: "var(--text-secondary)", fontWeight: 500 }}>{u.response_time}</td>
+                              <td style={{ padding: "12px 20px", color: "var(--text-secondary)", fontWeight: 500 }}>{u.response_time ?? "Not collected"}</td>
                             </tr>
                           ))}
                           {(!data.upstream_health || data.upstream_health.length === 0) && (
@@ -449,11 +438,11 @@ export default function NginxPage() {
                       <DetailRow label="Domain" value={selectedSite.all_domains && !["_", "-", "—"].includes(selectedSite.all_domains.trim()) ? selectedSite.all_domains : selectedSite.domain} emphasize />
                       <DetailRow label="Nginx Node" value={selectedSite.server_name} icon={<ServerIcon size={14} />} color="var(--color-blue)" />
                       <DetailRow label="Listen Address" value={selectedSite.listen} fontMono />
-                      <DetailRow label="Live Traffic" value={`${selectedSite.reqs} req/s`} fontMono />
-                      <DetailRow label="Errors (4xx / 5xx)" value={`${selectedSite.err_4xx} / ${selectedSite.err_5xx}`} fontMono color={selectedSite.err_5xx > 0 ? "var(--color-critical)" : (selectedSite.err_4xx > 0 ? "var(--color-warning)" : undefined)} />
+                      <DetailRow label="Live Traffic" value={selectedSite.reqs == null ? "Not collected" : `${selectedSite.reqs} req/s`} fontMono />
+                      <DetailRow label="Errors (4xx / 5xx)" value={selectedSite.err_4xx == null ? "Not collected" : `${selectedSite.err_4xx} / ${selectedSite.err_5xx}`} fontMono />
                       <DetailRow label="Upstream Pool" value={selectedSite.upstream} fontMono />
                       <DetailRow label="Proxy Target" value={selectedSite.proxy_targets?.join(", ") || "—"} fontMono />
-                      <DetailRow label="TLS Encryption" value={selectedSite.tls !== "—" ? `Managed (${selectedSite.tls})` : "—"} color={selectedSite.tls !== "—" ? "var(--color-healthy)" : undefined} />
+                      <DetailRow label="TLS Directive" value={selectedSite.tls === "configured" ? "Configured" : "Not configured"} color={selectedSite.tls === "configured" ? "var(--color-healthy)" : undefined} />
                       <DetailRow label="State" value={selectedSite.status} color={selectedSite.status === "Healthy" ? "var(--color-healthy)" : "var(--color-warning)"} />
                     </div>
                     

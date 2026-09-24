@@ -1,8 +1,9 @@
 "use client";
-import React, { useState, useEffect } from "react";
-import { FileText, Server, Box, Layers, AlignLeft, RefreshCw } from "lucide-react";
+import React, { useCallback, useState, useEffect } from "react";
+import { Server, Box, Layers, AlignLeft } from "lucide-react";
 import api from "@/lib/api";
 import { LogViewer, LogEntry } from "@/components/ui";
+import { DashboardDataState } from "@/components/ui/DashboardDataState";
 
 export default function LogsPage() {
   const [servers, setServers] = useState<{ id: string, name: string }[]>([]);
@@ -13,28 +14,47 @@ export default function LogsPage() {
   const [loading, setLoading] = useState(false);
   const [containers, setContainers] = useState<{ id: string, name: string }[]>([]);
   const [serversLoading, setServersLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  useEffect(() => {
-    api.get("/servers").then(res => {
+  const loadServers = useCallback(async () => {
+    setServersLoading(true);
+    setError("");
+    try {
+      const res = await api.get("/servers");
       setServers(res.data);
       if (res.data.length > 0) setSelectedServer(res.data[0].id);
-    }).catch(console.error).finally(() => setServersLoading(false));
+    } catch {
+      setError("Server inventory could not be loaded for the log explorer.");
+    } finally {
+      setServersLoading(false);
+    }
   }, []);
 
-  useEffect(() => {
+  useEffect(() => { void loadServers(); }, [loadServers]);
+
+  const loadContainers = useCallback(async () => {
     if (selectedServer && sourceType === "container") {
-      api.get(`/containers?server_id=${selectedServer}`).then(res => {
+      setError("");
+      try {
+        const res = await api.get(`/containers?server_id=${selectedServer}`);
         setContainers(res.data);
         if (res.data.length > 0) setSourceId(res.data[0].id);
         else setSourceId("");
-      }).catch(console.error);
+      } catch {
+        setContainers([]);
+        setSourceId("");
+        setError("Container inventory could not be loaded for the selected server.");
+      }
     }
   }, [selectedServer, sourceType]);
+
+  useEffect(() => { void loadContainers(); }, [loadContainers]);
 
   const fetchLogs = async (lines: number = 200) => {
     if (!selectedServer) return;
 
     setLoading(true);
+    setError("");
     try {
       if (sourceType === "container" && sourceId) {
         const res = await api.get(`/containers/${sourceId}/logs?tail=${lines}`);
@@ -58,10 +78,17 @@ export default function LogsPage() {
       }
     } catch (e) {
       console.error(e);
-      setLogs([{ timestamp: new Date().toISOString(), level: "error", message: "Failed to fetch logs from the server. Ensure the server is online and agent/SSH is reachable.", raw: "Error fetching logs" }]);
+      setLogs([]);
+      setError("Logs could not be read. Confirm that the selected server is online and its read-only collector is reachable.");
     } finally {
       setLoading(false);
     }
+  };
+
+  const retry = () => {
+    if (!selectedServer) return void loadServers();
+    if (sourceType === "container" && !sourceId) return void loadContainers();
+    void fetchLogs(200);
   };
 
   useEffect(() => {
@@ -93,7 +120,7 @@ export default function LogsPage() {
             <h1 style={{ fontSize: 28, fontWeight: 700, margin: 0, letterSpacing: "-0.02em" }}>Global Logs</h1>
           </div>
           <p style={{ margin: 0, color: "var(--text-secondary)", fontSize: 15, maxWidth: 600 }}>
-            Unified real-time log explorer. Seamlessly aggregate, filter, and analyze logs across all your servers and containers.
+            Read recent logs from one selected server or container source. This view does not aggregate or mutate remote logs.
           </p>
         </div>
       </div>
@@ -164,7 +191,7 @@ export default function LogsPage() {
       </div>
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-        <LogViewer
+        {error ? <DashboardDataState kind="error" title="Log data unavailable" description={error} onRetry={retry} /> : <LogViewer
           logs={logs}
           loading={loading}
           onRefresh={fetchLogs}
@@ -173,7 +200,7 @@ export default function LogsPage() {
               ? `Container: ${containers.find(c => c.id === sourceId)?.name || 'Unknown'}` 
               : `${sourceType.toUpperCase()} Logs (${servers.find(s => s.id === selectedServer)?.name || ''})`
           }
-        />
+        />}
       </div>
     </div>
   );

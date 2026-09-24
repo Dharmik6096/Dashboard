@@ -1,7 +1,5 @@
 """NGINX dashboard and aggregated metrics routes."""
-from typing import Optional, List, Dict, Any
-import random
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -13,12 +11,6 @@ from app.models.infrastructure_event import InfrastructureEvent
 from app.api.v1.servers import _get_ssh_client
 
 router = APIRouter(prefix="/nginx", tags=["nginx"])
-
-def _period_to_datetime(period: str) -> datetime:
-    now = datetime.now(timezone.utc)
-    mapping = {"5m": 5/60, "15m": 15/60, "1h": 1, "6h": 6, "24h": 24}
-    hours = mapping.get(period, 1)
-    return now - timedelta(hours=hours)
 
 @router.get("/dashboard")
 async def get_nginx_dashboard(
@@ -83,13 +75,9 @@ async def get_nginx_dashboard(
     all_sites = []
     total_upstreams = 0
     healthy_upstreams = 0
-    ssl_expiring_soon = 0
-    error_alerts = 0
-    
-    # We will compute mock metrics or rely on real ones if they exist. For Phase 3, we mock some dynamic metrics
-    # to fulfill the dashboard requirement visually, or keep them "—" if unavailable.
-    
-    ssl_watchlist = []
+    # Request/error rates and certificate expiry are intentionally unavailable until
+    # a real Nginx access-log and certificate collector persists those observations.
+    # Never manufacture monitoring data to make this page appear populated.
     
     for b in blocks:
         conf = config_dict[b.config_id]
@@ -130,17 +118,6 @@ async def get_nginx_dashboard(
                 continue
                 
         status = "Healthy" if srv.status == "online" else "Stale"
-        tls_str = "—"
-        if b.ssl:
-            # Mocking SSL expiry since we don't parse cert files yet
-            tls_str = "28d"
-            ssl_watchlist.append({"domain": primary_domain, "expires_in": "28 days", "status": "Warning"})
-            ssl_expiring_soon += 1
-            
-        reqs = random.randint(10, 500)
-        err_4xx = random.randint(0, int(reqs * 0.05))
-        err_5xx = random.randint(0, int(reqs * 0.01))
-        
         all_sites.append({
             "id": b.id,
             "server_id": str(srv.id),
@@ -150,10 +127,10 @@ async def get_nginx_dashboard(
             "listen": b.listen or "80",
             "upstream": primary_upstream,
             "proxy_targets": [l.proxy_pass for l in b_locs if l.proxy_pass],
-            "reqs": reqs,
-            "err_4xx": err_4xx,
-            "err_5xx": err_5xx,
-            "tls": tls_str,
+            "reqs": None,
+            "err_4xx": None,
+            "err_5xx": None,
+            "tls": "configured" if b.ssl else "not_configured",
             "status": status,
             "last_seen": srv.last_seen.isoformat() if srv.last_seen else None,
             "config": conf.source_path
@@ -180,8 +157,8 @@ async def get_nginx_dashboard(
             "name": u.name,
             "healthy": healthy,
             "total": total,
-            "response_time": f"{random.randint(15, 120)}ms" if healthy > 0 else "—",
-            "failed_checks": random.randint(0, 5) if healthy < total else 0,
+            "response_time": None,
+            "failed_checks": None,
             "targets": [{"host": t.host, "port": t.port, "status": "Healthy" if not t.down else "Unhealthy"} for t in ts]
         })
 
@@ -210,33 +187,15 @@ async def get_nginx_dashboard(
         "event": e.title
     } for e in events]
 
-    # Mock Traffic History
-    now = datetime.now(timezone.utc)
-    traffic_history = []
-    base_reqs = random.randint(500, 2000)
-    for i in range(24):
-        t = now - timedelta(minutes=5 * (23 - i))
-        # Add some variance and a spike
-        variance = random.randint(-200, 200)
-        spike = 1500 if i == 18 else 0
-        reqs = max(0, base_reqs + variance + spike)
-        traffic_history.append({
-            "time": t.isoformat(),
-            "reqs": reqs,
-            "errs": random.randint(0, int(reqs * 0.05))
-        })
-        
-    total_requests_per_second = sum(s["reqs"] for s in all_sites)
-
     return {
         "summary": {
             "nginx_servers": nginx_servers_count,
             "server_blocks": total_sites,
             "healthy_upstreams": healthy_upstreams,
             "total_upstreams": total_upstreams,
-            "requests_per_second": total_requests_per_second,
-            "error_alerts": error_alerts,
-            "ssl_expiring_soon": ssl_expiring_soon
+            "requests_per_second": None,
+            "error_alerts": None,
+            "ssl_expiring_soon": None
         },
         "sites": paginated_sites,
         "site_pagination": {
@@ -246,9 +205,15 @@ async def get_nginx_dashboard(
             "total_pages": (total_sites + page_size - 1) // page_size if page_size > 0 else 0
         },
         "upstream_health": upstream_health[:10],
-        "traffic_history": traffic_history,
+        "traffic_history": [],
         "recent_events": recent_events,
-        "ssl_watchlist": ssl_watchlist[:5],
+        "ssl_watchlist": [],
+        "telemetry_status": {
+            "traffic": "not_collected",
+            "http_errors": "not_collected",
+            "certificate_expiry": "not_collected",
+            "upstream_latency": "not_collected",
+        },
         "sampled_at": datetime.now(timezone.utc).isoformat()
     }
 
@@ -288,9 +253,9 @@ def _empty_dashboard():
             "server_blocks": 0,
             "healthy_upstreams": 0,
             "total_upstreams": 0,
-            "requests_per_second": "—",
-            "error_alerts": 0,
-            "ssl_expiring_soon": 0
+            "requests_per_second": None,
+            "error_alerts": None,
+            "ssl_expiring_soon": None
         },
         "sites": [],
         "site_pagination": {
@@ -303,5 +268,11 @@ def _empty_dashboard():
         "traffic_history": [],
         "recent_events": [],
         "ssl_watchlist": [],
+        "telemetry_status": {
+            "traffic": "not_collected",
+            "http_errors": "not_collected",
+            "certificate_expiry": "not_collected",
+            "upstream_latency": "not_collected",
+        },
         "sampled_at": datetime.now(timezone.utc).isoformat()
     }

@@ -1,7 +1,40 @@
 "use client";
-import { useEffect, useState } from "react";
-import { FileClock, Search, ShieldCheck } from "lucide-react";
-import api from "@/lib/api";
-type Entry={id:string;action:string;actor:string;resource_type?:string;resource_id?:string;ip_address?:string;created_at:string};
-export default function AuditPage(){const[entries,setEntries]=useState<Entry[]>([]);const[q,setQ]=useState("");const[message,setMessage]=useState("");useEffect(()=>{api.get("/organizations/audit-log").then(r=>setEntries(r.data)).catch(()=>setMessage("Audit data is unavailable until the API is connected."))},[]);const shown=entries.filter(e=>`${e.action} ${e.actor} ${e.resource_type||""}`.toLowerCase().includes(q.toLowerCase()));return <div className="v2-workspace-page"><header className="v2-page-head"><div><span>Security & governance</span><h1>Audit log</h1><p>A traceable record of identity, billing and workspace changes.</p></div><span className="v2-page-trust"><ShieldCheck size={15}/>Immutable event history</span></header>{message&&<div className="v2-inline-note">{message}</div>}<section className="v2-section-block"><div className="v2-section-title"><div><h2>Recent activity</h2><p>Infrastructure telemetry reads are summarized separately to keep this log useful.</p></div><label className="v2-table-search"><Search size={14}/><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Filter activity"/></label></div>{shown.length?<div className="v2-table audit"><div className="v2-table-head"><span>Action</span><span>Actor</span><span>Resource</span><span>IP address</span><span>Time</span></div>{shown.map(e=><div className="v2-table-row" key={e.id}><span><strong>{e.action}</strong></span><span>{e.actor}</span><span>{e.resource_type||"workspace"}{e.resource_id?` · ${e.resource_id.slice(0,8)}`:""}</span><span>{e.ip_address||"—"}</span><span>{new Date(e.created_at).toLocaleString()}</span></div>)}</div>:<div className="v2-empty-row"><FileClock size={20}/><div><strong>No audit events match</strong><span>Security-sensitive workspace activity will appear here.</span></div></div>}</section></div>}
 
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Search, ShieldCheck } from "lucide-react";
+
+import { DashboardDataState } from "@/components/ui/DashboardDataState";
+import api from "@/lib/api";
+
+type Entry = { id: string; action: string; actor: string; resource_type: string | null; resource_id: string | null; ip_address: string | null; created_at: string };
+
+export default function AuditPage() {
+  const [entries, setEntries] = useState<Entry[]>([]);
+  const [query, setQuery] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try { setEntries((await api.get<Entry[]>("/organizations/audit-log")).data); }
+    catch { setError("The audit API did not return workspace activity."); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+  const shown = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    return normalized ? entries.filter((entry) => `${entry.action} ${entry.actor} ${entry.resource_type || ""}`.toLowerCase().includes(normalized)) : entries;
+  }, [entries, query]);
+
+  return <div className="v2-workspace-page">
+    <header className="v2-page-head"><div><span>Security &amp; governance</span><h1>Audit log</h1><p>Review recorded identity, billing, and workspace changes.</p></div><span className="v2-page-trust"><ShieldCheck size={15} />Security event history</span></header>
+    <section className="v2-section-block"><div className="v2-section-title"><div><h2>Recent activity</h2><p>Up to 250 of the most recent recorded events are returned by the API.</p></div><label className="v2-table-search"><Search size={14} /><span className="sr-only">Filter activity</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Filter activity" /></label></div>
+      {loading ? <DashboardDataState kind="loading" title="Loading audit events" description="Reading the latest recorded workspace activity." />
+        : error ? <DashboardDataState kind="error" title="Audit log unavailable" description={error} onRetry={load} />
+          : shown.length === 0 ? <DashboardDataState kind="empty" title={query ? "No events match this filter" : "No audit events recorded"} description={query ? "Try a broader action, actor, or resource name." : "Security-sensitive workspace activity will appear here."} />
+            : <div className="v2-table audit"><div className="v2-table-head"><span>Action</span><span>Actor</span><span>Resource</span><span>IP address</span><span>Time</span></div>{shown.map((entry) => <div className="v2-table-row" key={entry.id}><span><strong>{entry.action}</strong></span><span>{entry.actor}</span><span>{entry.resource_type || "workspace"}{entry.resource_id ? ` · ${entry.resource_id.slice(0, 8)}` : ""}</span><span>{entry.ip_address || "—"}</span><span>{new Date(entry.created_at).toLocaleString()}</span></div>)}</div>}
+    </section>
+  </div>;
+}

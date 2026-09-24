@@ -185,10 +185,37 @@ def _rule_to_dict(r: AlertRule) -> dict:
 
 @router.get("/cpu-spikes")
 async def get_cpu_spikes(
-    limit: int = Query(50),
+    limit: int = Query(50, ge=1, le=500),
     db: AsyncSession = Depends(get_db)
 ):
-    # Since we don't have a specific table for cpu spikes in V1, 
-    # we return an empty list rather than mocked fake data.
-    return []
+    query = (
+        select(Alert, Server.name.label("server_name"), Container.name.label("container_name"))
+        .outerjoin(Server, Alert.server_id == Server.id)
+        .outerjoin(Container, Alert.container_db_id == Container.id)
+        .outerjoin(AlertRule, Alert.rule_id == AlertRule.id)
+        .where(func.lower(func.coalesce(Alert.metric_name, AlertRule.metric, "")).in_(["cpu", "cpu_percent"]))
+        .order_by(desc(Alert.fired_at))
+        .limit(limit)
+    )
+    rows = (await db.execute(query)).all()
+    now = datetime.now(timezone.utc)
+    return [_cpu_alert_to_spike(alert, server_name, container_name, now) for alert, server_name, container_name in rows]
 
+
+def _cpu_alert_to_spike(alert: Alert, server_name: str | None, container_name: str | None, now: datetime) -> dict:
+    fired_at = alert.fired_at
+    if fired_at.tzinfo is None:
+        fired_at = fired_at.replace(tzinfo=timezone.utc)
+    ended_at = alert.resolved_at or now
+    if ended_at.tzinfo is None:
+        ended_at = ended_at.replace(tzinfo=timezone.utc)
+    return {
+        "id": str(alert.id),
+        "timestamp": fired_at.isoformat(),
+        "server_name": server_name or "Unknown server",
+        "process_name": container_name or "Server CPU metric",
+        "peak_usage": float(alert.current_value or 0),
+        "duration_seconds": max(0, int((ended_at - fired_at).total_seconds())),
+        "severity": (alert.severity or "warning").capitalize(),
+        "status": alert.status,
+    }

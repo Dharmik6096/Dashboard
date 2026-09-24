@@ -237,9 +237,9 @@ async def get_redis_dashboard(
                 "last_seen": last_seen,
                 
                 # Detail Fields
-                "docker_network": "bridge", # placeholder
+                "docker_network": None,
                 "port": parsed.get("tcp_port", "6379"),
-                "bind": "0.0.0.0",
+                "bind": parsed.get("bind"),
                 "container_state": c.status.upper(),
                 "redis_status": "Healthy" if info_str else "Unavailable",
                 "uptime": f"{int(parsed.get('uptime_in_days', 0))} days" if parsed.get('uptime_in_days') else "-",

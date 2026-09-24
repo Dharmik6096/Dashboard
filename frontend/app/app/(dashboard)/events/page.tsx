@@ -1,9 +1,9 @@
 "use client";
 import React, { useEffect, useState, useCallback, useMemo } from "react";
-import { Activity, RefreshCw, Server, AlertCircle, Info, ShieldAlert, CheckCircle2, Box, Webhook, Clock, Terminal, ChevronDown, ChevronUp, Search, Calendar, Database } from "lucide-react";
+import { Activity, RefreshCw, Server, AlertCircle, Info, ShieldAlert, CheckCircle2, Box, Webhook, Clock, Terminal, ChevronDown, Search, Calendar, Database } from "lucide-react";
 import api from "@/lib/api";
-import { formatDateTime } from "@/lib/formatters";
 import { EmptyState, LoadingState } from "@/components/ui";
+import { DashboardDataState } from "@/components/ui/DashboardDataState";
 import { useFilter } from "@/lib/FilterContext";
 
 interface GlobalEvent {
@@ -41,6 +41,7 @@ export default function EventsPage() {
   const { envFilter, serverFilter } = useFilter();
   const [events, setEvents] = useState<GlobalEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [sourceFilter, setSourceFilter] = useState("all");
   const [severityFilter, setSeverityFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -49,6 +50,7 @@ export default function EventsPage() {
   const loadEvents = useCallback(async () => {
     try {
       setLoading(true);
+      setError("");
       const params = new URLSearchParams({ limit: "200" });
       if (sourceFilter !== "all") params.set("source_type", sourceFilter);
       if (severityFilter !== "all") params.set("severity", severityFilter);
@@ -59,6 +61,7 @@ export default function EventsPage() {
       setEvents(res.data);
     } catch (err) {
       console.error(err);
+      setError("The events API could not return the current timeline.");
     } finally {
       setLoading(false);
     }
@@ -105,7 +108,7 @@ export default function EventsPage() {
             </div>
             <div>
               <h1 style={{ fontSize: 28, fontWeight: 700, margin: 0, color: "var(--text-primary)" }}>Global Events Timeline</h1>
-              <p style={{ margin: 0, color: "var(--text-secondary)", fontSize: 14 }}>Real-time audit & infrastructure events tracking</p>
+              <p style={{ margin: 0, color: "var(--text-secondary)", fontSize: 14 }}>Recorded infrastructure and container lifecycle events</p>
             </div>
           </div>
         </div>
@@ -185,6 +188,8 @@ export default function EventsPage() {
       {/* Timeline Section */}
       {loading ? (
         <div className="card" style={{ padding: 60 }}><LoadingState /></div>
+      ) : error ? (
+        <div className="card"><DashboardDataState kind="error" title="Events unavailable" description={error} onRetry={loadEvents} /></div>
       ) : filteredEvents.length === 0 ? (
         <EmptyState title="No Events Found" desc="No events match your current criteria." />
       ) : (

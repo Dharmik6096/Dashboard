@@ -4,6 +4,7 @@ import api from "@/lib/api";
 import { formatDateTime } from "@/lib/formatters";
 import type { Alert } from "@/types";
 import { AlertTriangle, CheckCircle, Bell, RefreshCw, X } from "lucide-react";
+import { DashboardDataState } from "@/components/ui/DashboardDataState";
 
 function SkeletonRow({ cols }: { cols: number }) {
   return (
@@ -148,9 +149,12 @@ export default function AlertsPage() {
   const [statusFilter, setStatusFilter] = useState("active");
   const [severityFilter, setSeverityFilter] = useState("all");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [selectedAlert, setSelectedAlert] = useState<Alert | null>(null);
 
   const loadAlerts = useCallback(async () => {
+    setLoading(true);
+    setError("");
     try {
       const params = new URLSearchParams({ limit: "200" });
       if (statusFilter !== "all") params.set("status", statusFilter);
@@ -163,7 +167,9 @@ export default function AlertsPage() {
       ]);
       setAlerts(aRes.data);
       setSummary(sRes.data);
-    } catch { }
+    } catch {
+      setError("Alert data could not be loaded from the API.");
+    }
     finally { setLoading(false); }
   }, [statusFilter, severityFilter, envFilter, serverFilter]);
 
@@ -261,7 +267,7 @@ export default function AlertsPage() {
         </div>
       </div>
 
-      <div className="card" style={{ padding: 0 }}>
+      {error ? <div className="card"><DashboardDataState kind="error" title="Alerts unavailable" description={error} onRetry={loadAlerts} /></div> : <div className="card" style={{ padding: 0 }}>
         <table className="data-table">
           <thead>
             <tr>
@@ -324,6 +330,7 @@ export default function AlertsPage() {
           </tbody>
         </table>
       </div>
+      }
 
       <AlertDetailDrawer alert={selectedAlert} onClose={() => setSelectedAlert(null)} />
     </div>

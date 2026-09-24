@@ -17,6 +17,7 @@ import { formatPercent, formatLastSeen, metricColor, safeValue, formatDateTime }
 import { Server as ServerIcon, Activity, RefreshCw, LayoutTemplate, Clock, Settings, Box, Shield, AlertTriangle, ArrowRight, Zap, Cpu, HardDrive, Network, Layers, Terminal, Sparkles, X, Info, Send, User } from "lucide-react";
 import { TimeSeriesChart, TimeRangeSelector, TimeRange } from "@/components/ui/charts";
 import { motion, AnimatePresence } from "framer-motion";
+import { DashboardDataState } from "@/components/ui/DashboardDataState";
 
 function bytes(b: number | undefined | null): string {
   if (b == null) return "0B";
@@ -47,6 +48,8 @@ export default function ServerDetailPage() {
   const [period, setPeriod] = useState<TimeRange>("1h");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  const [partialWarning, setPartialWarning] = useState("");
   const [activeTab, setActiveTab] = useState<string>("Resource Trends");
   
   const [isAiPanelOpen, setIsAiPanelOpen] = useState(false);
@@ -73,7 +76,9 @@ export default function ServerDetailPage() {
   }, []);
 
   const load = useCallback(async () => {
-    if (!loading) setRefreshing(true);
+    setRefreshing(true);
+    setLoadError("");
+    setPartialWarning("");
     try {
       const [sRes, cRes, hRes, dRes, nRes, aRes, pRes, ptsRes, nginxRes, srvRes] = await Promise.allSettled([
         api.get(`/servers/${id}`),
@@ -91,7 +96,7 @@ export default function ServerDetailPage() {
       if (!mounted.current) return;
 
       if (sRes.status === "fulfilled") setServer(sRes.value.data);
-      else router.push(routes.servers); // Failed to fetch server identity
+      else setLoadError("Server identity could not be loaded from the API.");
       
       if (cRes.status === "fulfilled") setContainers(cRes.value.data || []);
       if (hRes.status === "fulfilled") setHistory(hRes.value.data || []);
@@ -138,6 +143,10 @@ export default function ServerDetailPage() {
               setPorts([]);
           }
       }
+
+      const secondaryResults = [cRes, hRes, dRes, nRes, aRes, pRes, ptsRes, nginxRes, srvRes];
+      const failedSources = secondaryResults.filter((result) => result.status === "rejected").length;
+      if (failedSources > 0) setPartialWarning(`${failedSources} read-only data source${failedSources === 1 ? "" : "s"} could not be loaded. Available sections are still shown.`);
       
     } catch {
       // safe
@@ -147,7 +156,7 @@ export default function ServerDetailPage() {
          setRefreshing(false);
       }
     }
-  }, [id, period, router, loading]);
+  }, [id, period]);
 
   useEffect(() => { 
     const timer = setTimeout(() => load(), 0);
@@ -155,11 +164,12 @@ export default function ServerDetailPage() {
     return () => { clearTimeout(timer); clearInterval(iv); }; 
   }, [load]);
 
-  if (loading || !server) return (
+  if (loading) return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "60vh", color: "var(--text-secondary)" }}>
       <RefreshCw size={24} className="spin" style={{ marginRight: 8 }} /> Loading server command center...
     </div>
   );
+  if (!server) return <div style={{ maxWidth: 760, margin: "80px auto" }}><DashboardDataState kind="error" title="Server command center unavailable" description={loadError || "The requested server was not returned by the API."} onRetry={load} /><button type="button" className="btn btn-secondary" style={{ marginTop: 12 }} onClick={() => router.push(routes.servers)}>Return to Servers</button></div>;
 
   const cpu = safeValue(server.last_cpu_percent, null);
   const ram = safeValue(server.last_ram_percent, null);
@@ -246,6 +256,15 @@ export default function ServerDetailPage() {
             </div>
          </div>
       </div>
+
+      {partialWarning ? (
+        <DashboardDataState
+          kind="warning"
+          title="Some server sections are unavailable"
+          description={partialWarning}
+          onRetry={load}
+        />
+      ) : null}
 
       {/* HEADER IDENTITY */}
       <div className="flex-between" style={{ background: "var(--bg-primary)", padding: "24px 32px", borderRadius: 16, border: "1px solid var(--border)", boxShadow: "0 4px 20px rgba(0,0,0,0.04)" }}>

@@ -51,7 +51,8 @@ async def get_network_dashboard(
     online_ids = [s.id for s in online_servers]
     server_map = {s.id: s for s in servers}
 
-    # 2. Latest metrics to simulate interface data
+    # 2. Latest server-level network rates. The collector does not currently
+    # persist per-interface identity, packet errors, drops, or MTU.
     interfaces = []
     top_consumers = []
     total_rx_MBps = 0.0
@@ -82,18 +83,19 @@ async def get_network_dashboard(
             
             srv = server_map.get(metric.server_id)
             if srv:
-                # Add to interfaces
+                # Expose the recorded server aggregate without inventing an
+                # interface name or counters the collector did not send.
                 interfaces.append({
                     'server_id': str(srv.id),
                     'server_name': srv.name,
-                    'interface': 'eth0',
+                    'interface': 'Server aggregate',
                     'ip_address': srv.ip_address,
                     'status': 'UP' if srv.status == 'online' else 'DOWN',
                     'rx': rx_MBps,
                     'tx': tx_MBps,
-                    'errors': 0, # simulated
-                    'drops': 2 if srv.status == 'warning' else 0, # simulated
-                    'mtu': 1500,
+                    'errors': None,
+                    'drops': None,
+                    'mtu': None,
                     'last_seen': srv.last_success_at.isoformat() if srv.last_success_at else None,
                 })
                 # Add to top consumers
@@ -155,10 +157,17 @@ async def get_network_dashboard(
             'active_interfaces': len([i for i in interfaces if i['status'] == 'UP']),
             'total_rx_MBps': total_rx_MBps,
             'total_tx_MBps': total_tx_MBps,
-            'network_errors': sum(i['errors'] for i in interfaces),
-            'packet_drops': sum(i['drops'] for i in interfaces),
+            'network_errors': None,
+            'packet_drops': None,
         },
         'interfaces': interfaces,
         'top_consumers': top_consumers,
-        'history': history
+        'history': history,
+        'telemetry_status': {
+            'rates': 'collected',
+            'interface_identity': 'not_collected',
+            'errors': 'not_collected',
+            'drops': 'not_collected',
+            'mtu': 'not_collected',
+        },
     }

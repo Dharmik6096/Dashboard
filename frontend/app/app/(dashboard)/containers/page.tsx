@@ -1,13 +1,13 @@
 "use client";
 import { routes } from "@/lib/routes";
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import api from "@/lib/api";
 import type { Container, Server } from "@/types";
 import { useFilter } from "@/lib/FilterContext";
 import { formatBytes, formatLastSeen } from "@/lib/formatters";
-import { Box, Search, RefreshCw, Server as ServerIcon, Play, AlertTriangle, RotateCw, HardDrive, Cpu, MemoryStick, ArrowUpRight, ArrowDownRight, MoreVertical } from "lucide-react";
+import { Box, Search, RefreshCw, Server as ServerIcon, Play, AlertTriangle, RotateCw, HardDrive, Cpu, MemoryStick } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 
 function SortIcon({ col, sortCol, sortDir }: { col: keyof Container, sortCol: string, sortDir: string }) {
   if (sortCol !== col) return <span style={{ opacity: 0.3, marginLeft: 4, display: "inline-block", fontSize: "0.85em" }}>↕</span>;
@@ -38,10 +38,13 @@ export default function ContainersPage() {
   const [sortCol, setSortCol] = useState<keyof Container>("name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState("");
+  const initialLoad = useRef(true);
 
   const load = useCallback(async () => {
     setRefreshing(true);
-    if (containers.length === 0) setLoading(true);
+    setError("");
+    if (initialLoad.current) setLoading(true);
     const params = new URLSearchParams();
     if (envFilter !== "all") params.append("env", envFilter);
     if (serverFilter !== "all") params.append("server_id", serverFilter);
@@ -56,8 +59,10 @@ export default function ContainersPage() {
       setServersData(sRes.data);
     } catch (err) {
       console.error(err);
+      setError("Container inventory could not be loaded from the API.");
     } finally {
       setLoading(false);
+      initialLoad.current = false;
       setRefreshing(false);
     }
   }, [envFilter, serverFilter]);
@@ -155,7 +160,7 @@ export default function ContainersPage() {
             transition={{ delay: 0.1 }}
             className="page-subtitle" style={{ marginTop: 6 }}
           >
-            Manage and monitor {stats.total} containers deployed across {serverCount} servers globally.
+            Observe {stats.total} containers across {serverCount} monitored servers. No runtime controls are enabled.
           </motion.p>
         </div>
         <div style={{ display: "flex", gap: 12 }}>
@@ -266,6 +271,8 @@ export default function ContainersPage() {
               <tbody>
                 {Array.from({ length: 8 }).map((_, i) => <SkeletonRow key={i} cols={10} />)}
               </tbody>
+            ) : error ? (
+              <tbody><tr><td colSpan={10} style={{ padding: 60, textAlign: "center", color: "var(--color-critical)" }}><AlertTriangle size={28} style={{ margin: "0 auto 10px" }} />{error}<br /><button type="button" onClick={load} className="btn btn-secondary" style={{ marginTop: 14 }}>Try again</button></td></tr></tbody>
             ) : sorted.length === 0 ? (
               <tbody>
                 <tr>
@@ -395,7 +402,7 @@ export default function ContainersPage() {
           </table>
         </div>
         
-        {/* Pagination/Footer (Placeholder for actual pagination if needed) */}
+        {/* Result summary */}
         {!loading && sorted.length > 0 && (
           <div style={{ padding: "12px 20px", borderTop: "1px solid var(--border)", background: "var(--bg-secondary)", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13, color: "var(--text-muted)" }}>
             Showing {sorted.length} of {containers.length} containers

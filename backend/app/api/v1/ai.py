@@ -1,10 +1,12 @@
 """AI Chat endpoint — uses Gemini (primary) with Groq fallback."""
 import httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import List
 
 from app.config import settings
+from app.api.v1.auth import get_current_user
+from app.models.user import User
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
@@ -137,28 +139,21 @@ async def _call_groq(messages: List[ChatMessage]) -> tuple[str, str]:
 
 
 @router.post("/chat", response_model=ChatResponse)
-async def ai_chat(body: ChatRequest):
+async def ai_chat(body: ChatRequest, _user: User = Depends(get_current_user)):
     """Send messages to Gemini (primary) or Groq (fallback) and return the reply."""
 
     # Temporary poor-man's function calling injection for Docker images test
     last_msg = body.messages[-1].content.lower()
-    print(f"DEBUG AI: last_msg is {last_msg}")
-    print(f"DEBUG AI: context is {body.context}")
     if "docker images" in last_msg or "how many images" in last_msg:
         if body.context and body.context.server_id:
             from app.api.v1.ai_tools import get_docker_image_summary
             import json
             try:
-                print(f"DEBUG AI: calling get_docker_image_summary for {body.context.server_id}")
                 res = await get_docker_image_summary(body.context.server_id)
-                print(f"DEBUG AI: result is {res}")
                 injection = f"\n\n[SYSTEM TOOL RESULT: get_docker_image_summary({body.context.server_id}) returned: {json.dumps(res)}]"
                 body.messages[-1].content += injection
             except Exception as e:
-                print(f"DEBUG AI: error in tool call: {e}")
                 body.messages[-1].content += f"\n\n[SYSTEM TOOL ERROR: {str(e)}]"
-        else:
-            print("DEBUG AI: no context or server_id provided")
 
     try:
         # --- Primary: Gemini ---

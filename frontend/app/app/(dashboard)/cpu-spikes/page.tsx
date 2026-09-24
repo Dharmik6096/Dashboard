@@ -17,16 +17,19 @@ interface CpuSpike {
 export default function CpuSpikesPage() {
   const [spikes, setSpikes] = useState<CpuSpike[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [filterSeverity, setFilterSeverity] = useState<string>("All");
   const [filterServer, setFilterServer] = useState<string>("All");
 
   const fetchSpikes = async () => {
     setLoading(true);
+    setError("");
     try {
       const res = await api.get("/alerts/cpu-spikes?limit=50");
       setSpikes(res.data);
     } catch (e) {
       console.error(e);
+      setError("CPU spike history could not be loaded from the alerts API.");
     } finally {
       setLoading(false);
     }
@@ -80,7 +83,7 @@ export default function CpuSpikesPage() {
             <h1 style={{ fontSize: 28, fontWeight: 700, margin: 0, letterSpacing: "-0.02em" }}>CPU Spikes</h1>
           </div>
           <p style={{ margin: 0, color: "var(--text-secondary)", fontSize: 15, maxWidth: 600 }}>
-            Real-time monitoring and historical records of unusual CPU utilization across all server nodes and processes.
+            CPU-related alert records derived from the live alert engine. Values reflect the observation stored with each alert.
           </p>
         </div>
         <button 
@@ -169,7 +172,7 @@ export default function CpuSpikesPage() {
       <div style={{ background: "var(--bg-card)", borderRadius: 12, border: "1px solid var(--border)", overflow: "hidden", display: "flex", flexDirection: "column", flex: 1 }}>
         <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 12 }}>
           <BarChart2 size={18} color="var(--text-secondary)" />
-          <h2 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>Recent Activity Anomalies</h2>
+          <h2 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>Recorded CPU alerts</h2>
         </div>
         
         <div style={{ overflowX: "auto", flex: 1 }}>
@@ -178,8 +181,8 @@ export default function CpuSpikesPage() {
               <tr style={{ background: "var(--bg-body)", color: "var(--text-secondary)", fontSize: 12, textTransform: "uppercase", letterSpacing: "0.05em" }}>
                 <th style={{ padding: "12px 20px", fontWeight: 600 }}>Timestamp</th>
                 <th style={{ padding: "12px 20px", fontWeight: 600 }}>Server</th>
-                <th style={{ padding: "12px 20px", fontWeight: 600 }}>Process</th>
-                <th style={{ padding: "12px 20px", fontWeight: 600 }}>Peak Usage</th>
+                <th style={{ padding: "12px 20px", fontWeight: 600 }}>Source</th>
+                <th style={{ padding: "12px 20px", fontWeight: 600 }}>Observed Value</th>
                 <th style={{ padding: "12px 20px", fontWeight: 600 }}>Duration</th>
                 <th style={{ padding: "12px 20px", fontWeight: 600 }}>Severity</th>
               </tr>
@@ -192,6 +195,8 @@ export default function CpuSpikesPage() {
                     Loading anomalies...
                   </td>
                 </tr>
+              ) : error ? (
+                <tr><td colSpan={6} style={{ padding: 40, textAlign: "center", color: "var(--color-critical)" }}><AlertTriangle size={22} style={{ margin: "0 auto 10px" }} />{error}<br /><button type="button" onClick={fetchSpikes} className="btn btn-secondary" style={{ marginTop: 14 }}>Try again</button></td></tr>
               ) : filteredSpikes.length === 0 ? (
                 <tr>
                   <td colSpan={6} style={{ padding: 40, textAlign: "center", color: "var(--text-secondary)" }}>

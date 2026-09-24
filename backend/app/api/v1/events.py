@@ -5,9 +5,21 @@ from sqlalchemy import select
 from app.database import get_db
 from app.models.infrastructure_event import InfrastructureEvent
 from app.models.container import ContainerEvent
-from app.models.audit import AuditLog
 
 router = APIRouter(prefix="/events", tags=["events"])
+
+
+def _infrastructure_event_dict(event, server_name: str | None) -> dict:
+    return {"id": f"infra-{event.id}", "timestamp": event.detected_at.isoformat(), "server_id": str(event.server_id), "server_name": server_name, "source": event.source, "source_type": event.source, "event_type": event.event_type, "severity": event.severity, "title": event.title, "details": event.details}
+
+
+def _container_event_dict(event, server_name: str | None) -> dict:
+    severity = "info"
+    if event.event_type in {"die", "oom", "oom_killed", "kill"} or event.oom_killed:
+        severity = "critical"
+    elif event.event_type == "restart":
+        severity = "warning"
+    return {"id": f"cont-{event.id}", "timestamp": event.occurred_at.isoformat(), "server_id": str(event.server_id), "server_name": server_name, "source": event.container_name or "docker", "source_type": "container", "event_type": event.event_type, "severity": severity, "title": f"Container {event.event_type.replace('_', ' ')}", "details": event.reason}
 
 @router.get("")
 async def get_all_events(
@@ -41,7 +53,7 @@ async def get_all_events(
     infra_events = infra_res.scalars().all()
 
     # Fetch Container Events
-    container_query = select(ContainerEvent).order_by(ContainerEvent.created_at.desc())
+    container_query = select(ContainerEvent).order_by(ContainerEvent.occurred_at.desc())
     
     if env and env.lower() not in ("all", "all environments", ""):
         container_query = container_query.join(Server, ContainerEvent.server_id == Server.id).where(func.lower(Server.environment) == env.lower())
@@ -58,40 +70,20 @@ async def get_all_events(
         cont_res = await db.execute(container_query.limit(limit))
         container_events = cont_res.scalars().all()
 
-    normalized = []
-    for e in infra_events:
-        normalized.append({
-            "id": f"infra-{e.id}",
-            "timestamp": e.detected_at.isoformat(),
-            "server_id": str(e.server_id),
-            "source": e.source,
-            "source_type": e.source,
-            "event_type": e.event_type,
-            "severity": e.severity,
-            "title": e.title,
-            "details": e.details
-        })
+    server_ids = {event.server_id for event in infra_events}
+    server_ids.update(event.server_id for event in container_events)
+    server_names = {}
+    if server_ids:
+        server_rows = await db.execute(select(Server.id, Server.name).where(Server.id.in_(server_ids)))
+        server_names = {server_id: name for server_id, name in server_rows.all()}
+
+    normalized = [_infrastructure_event_dict(event, server_names.get(event.server_id)) for event in infra_events]
 
     for e in container_events:
-        # For ContainerEvent, we map severity based on event_type
-        sev = "info"
-        if e.event_type in ["die", "oom", "kill"]: sev = "critical"
-        elif e.event_type in ["restart"]: sev = "warning"
-        
-        if severity and sev != severity:
+        item = _container_event_dict(e, server_names.get(e.server_id))
+        if severity and item["severity"] != severity:
             continue
-            
-        normalized.append({
-            "id": f"cont-{e.id}",
-            "timestamp": e.created_at.isoformat(),
-            "server_id": str(e.server_id),
-            "source": e.container_id[:12] if e.container_id else "docker",
-            "source_type": "container",
-            "event_type": e.event_type,
-            "severity": sev,
-            "title": f"Container {e.event_type}",
-            "details": e.message
-        })
+        normalized.append(item)
 
     # Sort combined
     normalized.sort(key=lambda x: x["timestamp"], reverse=True)

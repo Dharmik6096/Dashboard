@@ -1,14 +1,13 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
-  RefreshCw, Search, Database, Server,
-  AlertTriangle, CheckCircle2, ChevronRight, ChevronDown,
-  ChevronLeft, X, Activity, Info, AlertCircle, PlayCircle, ShieldCheck,
+  RefreshCw, Search, Database,
+  ChevronRight, ChevronDown,
+  Activity, Info, AlertCircle, PlayCircle, ShieldCheck,
   LayoutGrid, Cpu, MemoryStick, HardDrive, Clock, RotateCcw
 } from "lucide-react";
 import { api } from "@/lib/api";
-import Link from "next/link";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from "recharts";
@@ -122,7 +121,7 @@ const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString([],{hour:"2-di
 // ─────────────────────────────────────────────────────────────────────────────
 // Expanded Detail Component
 // ─────────────────────────────────────────────────────────────────────────────
-function ExpandedDetail({ item, onClose }: { item: DbInstance; onClose?: () => void }) {
+function ExpandedDetail({ item }: { item: DbInstance }) {
   const [detail, setDetail] = useState<DetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"overview" | "queries" | "logs" | "config">("overview");
@@ -134,7 +133,7 @@ function ExpandedDetail({ item, onClose }: { item: DbInstance; onClose?: () => v
       .then(r => setDetail(r.data as DetailData))
       .catch(() => setDetail({ ...item, sparkline: [], recent_alerts: [], engine_telemetry_available: false, data_source: "docker_stats" }))
       .finally(() => setLoading(false));
-  }, [item.id]);
+  }, [item]);
 
   const d = detail ?? item;
   const sparkline = detail?.sparkline ?? [];
@@ -303,9 +302,7 @@ function ExpandedDetail({ item, onClose }: { item: DbInstance; onClose?: () => v
             <p style={{ fontSize: 'var(--font-md)', color: 'var(--text-secondary)', maxWidth: 500, margin: '0 0 24px 0', lineHeight: 1.5 }}>
               Tracking query execution plans and long-running transactions requires the specific {d.engine} engine collector to be enabled.
             </p>
-            <button style={{ background: 'var(--color-blue)', color: '#fff', border: 'none', padding: '8px 24px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-sm)', fontWeight: 600, cursor: 'pointer' }}>
-              Configure Engine Collector
-            </button>
+            <span className="roadmap-badge">Engine collector · Roadmap</span>
           </div>
         )}
 
@@ -314,14 +311,14 @@ function ExpandedDetail({ item, onClose }: { item: DbInstance; onClose?: () => v
           <div style={{ display: 'flex', flexDirection: 'column', height: 400, background: '#000', borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1px solid var(--border)' }}>
             <div style={{ background: 'var(--bg-elevated)', padding: '8px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)' }}>
               <span style={{ fontSize: 'var(--font-xs)', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{d.container_name} logs</span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--font-xs)', color: 'var(--color-healthy)' }}>
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--color-healthy)', animation: 'pulse-dot 2s infinite' }} /> Connected
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--font-xs)', color: 'var(--text-muted)' }}>
+                Roadmap
               </span>
             </div>
             <div style={{ flex: 1, padding: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                <AlertCircle size={32} color="var(--text-muted)" style={{ marginBottom: 12 }} />
-               <p style={{ color: 'var(--text-muted)', fontSize: 'var(--font-sm)', fontFamily: 'var(--font-mono)' }}>Waiting for log stream...</p>
-               <p style={{ color: 'var(--text-muted)', fontSize: 'var(--font-xs)', fontFamily: 'var(--font-mono)' }}>[Agent configuration required to tail container output]</p>
+               <p style={{ color: 'var(--text-muted)', fontSize: 'var(--font-sm)', fontFamily: 'var(--font-mono)' }}>Database log streaming is not implemented yet.</p>
+               <p style={{ color: 'var(--text-muted)', fontSize: 'var(--font-xs)', fontFamily: 'var(--font-mono)' }}>[Roadmap: read-only engine collector]</p>
             </div>
           </div>
         )}
@@ -338,9 +335,7 @@ function ExpandedDetail({ item, onClose }: { item: DbInstance; onClose?: () => v
               <p style={{ fontSize: 'var(--font-md)', color: 'var(--text-secondary)', maxWidth: 400, textAlign: 'center', margin: '0 0 24px 0' }}>
                 Live database parameter inspection (e.g. max_connections, shared_buffers) requires the telemetry collector.
               </p>
-              <button style={{ background: 'var(--bg-elevated)', color: 'var(--text-primary)', border: '1px solid var(--border-subtle)', padding: '8px 24px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-sm)', fontWeight: 600, cursor: 'pointer' }}>
-                Setup Telemetry
-              </button>
+              <span className="roadmap-badge">Engine telemetry · Roadmap</span>
             </div>
           </div>
         )}
@@ -420,7 +415,6 @@ export default function DatabaseMonitoringPage() {
   const total = data?.total ?? 0;
   const healthy = data?.healthy ?? 0;
   const critical = data?.critical ?? 0;
-  const warning = data?.warning ?? 0;
 
   // Custom Inline Metric Card to match design tokens
   const renderMetricCard = (label: string, value: any, Icon: any, color: string, pulse: boolean = false) => (
@@ -686,7 +680,7 @@ export default function DatabaseMonitoringPage() {
                       {isExpanded && (
                         <tr style={{ background: 'var(--bg-elevated)', borderBottom: '1px solid var(--border)' }}>
                           <td colSpan={6} style={{ padding: 0 }}>
-                            <ExpandedDetail item={db} onClose={() => setExpandedRow(null)} />
+                            <ExpandedDetail item={db} />
                           </td>
                         </tr>
                       )}
