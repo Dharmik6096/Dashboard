@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
 import { Footer } from "@/components/layout/Footer";
@@ -9,6 +10,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   // SSR hydration safe
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     setTimeout(() => {
@@ -16,9 +18,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       if (saved === "true") {
         setSidebarCollapsed(true);
       }
+      
+      const token = sessionStorage.getItem("access_token") || localStorage.getItem("access_token");
+      if (!token) {
+        router.push("/login");
+        return;
+      }
+      
       setMounted(true);
     }, 0);
-  }, []);
+  }, [router]);
 
   const handleToggle = () => {
     const newVal = !sidebarCollapsed;

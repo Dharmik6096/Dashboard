@@ -2,13 +2,13 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Activity, BellRing, Boxes, BrainCircuit, ChevronLeft, CircleGauge, Clock3, CreditCard, Database, DatabaseZap, FileClock, HardDrive, LogOut, MessageSquareMore, Network, PanelLeft, PlugZap, Server, Settings, ShipWheel, Sparkles, Users, Waypoints } from "lucide-react";
+import { Activity, BellRing, Boxes, BrainCircuit, ChevronLeft, CircleGauge, Clock3, CreditCard, Database, DatabaseZap, FileClock, HardDrive, LogOut, MessageSquareMore, Network, PanelLeft, PlugZap, Server, Settings, ShipWheel, Sparkles, Users, Waypoints, LayoutDashboard } from "lucide-react";
 import api from "@/lib/api";
 import { BrandMark } from "@/components/marketing/BrandMark";
 
 type Item={href:string;label:string;icon:React.ElementType;badge?:"alerts"|"new"};
 const groups:{label:string;items:Item[]}[]=[
- {label:"Observe",items:[{href:"/app",label:"Overview",icon:CircleGauge},{href:"/app/servers",label:"Servers",icon:Server},{href:"/app/containers",label:"Containers",icon:Boxes},{href:"/app/processes",label:"Processes",icon:Activity},{href:"/app/network",label:"Network",icon:Network},{href:"/app/storage",label:"Storage",icon:HardDrive},{href:"/app/ports",label:"Ports",icon:PlugZap}]},
+ {label:"Observe",items:[{href:"/app",label:"Overview",icon:CircleGauge},{href:"/app/dashboards",label:"Dashboards",icon:LayoutDashboard},{href:"/app/servers",label:"Servers",icon:Server},{href:"/app/containers",label:"Containers",icon:Boxes},{href:"/app/processes",label:"Processes",icon:Activity},{href:"/app/network",label:"Network",icon:Network},{href:"/app/storage",label:"Storage",icon:HardDrive},{href:"/app/ports",label:"Ports",icon:PlugZap}]},
  {label:"Data services",items:[{href:"/app/nginx",label:"Nginx",icon:Waypoints},{href:"/app/docker",label:"Docker",icon:ShipWheel},{href:"/app/databases",label:"Databases",icon:Database},{href:"/app/redis",label:"Redis",icon:DatabaseZap},{href:"/app/rabbitmq",label:"RabbitMQ",icon:MessageSquareMore}]},
  {label:"Investigate",items:[{href:"/app/alerts",label:"Alerts",icon:BellRing,badge:"alerts"},{href:"/app/events",label:"Events",icon:FileClock},{href:"/app/cpu-spikes",label:"CPU spikes",icon:Sparkles},{href:"/app/cron",label:"Cron jobs",icon:Clock3},{href:"/app/ai",label:"AI assistant",icon:BrainCircuit,badge:"new"}]},
  {label:"Workspace",items:[{href:"/app/team",label:"Team & access",icon:Users},{href:"/app/billing",label:"Plans & billing",icon:CreditCard},{href:"/app/audit",label:"Audit log",icon:FileClock},{href:"/app/settings",label:"Settings",icon:Settings}]},

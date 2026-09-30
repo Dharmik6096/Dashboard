@@ -44,7 +44,7 @@ api.interceptors.response.use(
           localStorage.removeItem("access_token");
           localStorage.removeItem("refresh_token");
           sessionStorage.removeItem("access_token");
-          if (!window.location.pathname.includes("/login")) {
+          if (window.location.pathname.startsWith("/app")) {
             window.location.replace("/login");
           }
         }
@@ -52,7 +52,9 @@ api.interceptors.response.use(
         localStorage.removeItem("access_token");
         localStorage.removeItem("refresh_token");
         sessionStorage.removeItem("access_token");
-        window.location.replace("/login");
+        if (window.location.pathname.startsWith("/app")) {
+          window.location.replace("/login");
+        }
       }
     }
 
